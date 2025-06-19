@@ -1,0 +1,12 @@
+{
+  "name": "roll",
+  "module": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "bun build --minify src/index.js --watch --outfile ./dist/js/bundle.js",
+    "docs": "documentation build src/** -f html -o docs --shallow"
+  },
+  "devDependencies": {
+    "documentation": "^14.0.2"
+  }
+}
