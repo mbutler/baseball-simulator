@@ -6,6 +6,8 @@ import { parseTables } from './utils/parseTables.js'
 import { parseStatTable } from './utils/statParser.js'
 import { normalizeBattingStats, normalizePitchingStats } from './utils/statNormalizer.js'
 import { buildRoster } from './core/rosterBuilder.js'
+import { prepareMatchups } from './core/matchupPreparer.js'
+import { initGameState, simulateAtBat } from './core/gameEngine.js'
 
 /**
  * Logs a preview of a given HTMLTableElement.
@@ -32,7 +34,7 @@ function logTablePreview(table, label, maxRows = 5) {
 }
 
 /**
- * Loads the team HTML and extracts relevant tables and metadata.
+ * Loads the team HTML and simulates a full game between two rosters.
  */
 async function main() {
   try {
@@ -50,7 +52,6 @@ async function main() {
 
     logTablePreview(batting, 'Batting')
     logTablePreview(pitching, 'Pitching')
-    logTablePreview(fielding, 'Fielding')
 
     const battingRaw = parseStatTable(batting)
     const pitchingRaw = parseStatTable(pitching)
@@ -58,10 +59,7 @@ async function main() {
     const batters = normalizeBattingStats(battingRaw)
     const pitchers = normalizePitchingStats(pitchingRaw)
 
-    console.log('🎯 Normalized batting example:', batters.slice(0, 2))
-    console.log('🎯 Normalized pitching example:', pitchers.slice(0, 2))
-
-    // Automatically select the first 9 unique batters and 1 pitcher
+    // Automatically select first 9 unique batters and first pitcher
     const lineupIds = batters
       .map(b => b.player_id)
       .filter((id, i, arr) => id && arr.indexOf(id) === i)
@@ -69,12 +67,25 @@ async function main() {
 
     const pitcherId = pitchers.find(p => p.player_id)?.player_id
 
-    const roster = buildRoster(lineupIds, pitcherId, batters, pitchers)
+    const homeRoster = buildRoster(lineupIds, pitcherId, batters, pitchers)
+    const awayRoster = buildRoster(lineupIds, pitcherId, batters, pitchers) // same team for now
 
-    console.log('🏆 Built roster:', roster)
+    const homeMatchups = prepareMatchups(homeRoster)
+    const awayMatchups = prepareMatchups(awayRoster)
+
+    const state = initGameState()
+
+    console.log('⚾ Starting simulation...')
+
+    while (state.inning <= 9 || state.score[0] === state.score[1]) {
+      const result = simulateAtBat(awayMatchups, homeMatchups, state)
+      console.log(`Inning ${state.inning} ${state.top ? '↑' : '↓'} — ${result.batter_id}: ${result.outcome}`)
+    }
+
+    console.log(`🏁 Final Score: Away ${state.score[0]} — Home ${state.score[1]}`)
 
   } catch (err) {
-    console.error('❌ Error loading team HTML:', err)
+    console.error('❌ Error during simulation:', err)
   }
 }
 
