@@ -38,7 +38,7 @@ async function main() {
 
     console.log('🌐 Loaded team HTML')
 
-    const { batting, pitching, fielding, team_defense_text } = parseTables(html)
+    const { batting, pitching, fielding } = parseTables(html)
 
     console.log('🧪 Table detection:')
     console.log('   batting:', batting ? '✅ found' : '❌ missing')
