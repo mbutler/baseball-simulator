@@ -89,14 +89,6 @@ export function simulateAtBat(awayMatchups, homeMatchups, state) {
     state.score[teamIndex] += runs
   }
 
-  // Half-inning complete
-  if (state.outs >= 3) {
-    state.outs = 0
-    state.bases = [0, 0, 0]
-    state.top = !state.top
-    if (state.top) state.inning++
-  }
-
   return {
     batter_id: matchup.batter_id,
     outcome: descriptiveOutcome

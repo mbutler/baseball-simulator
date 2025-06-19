@@ -1,10 +1,11 @@
-/**
- * @fileoverview Downloads a Baseball Reference team page and saves it to /data for use in the browser.
- * Usage: bun src/scripts/downloadHtml.js CHC 2025
- */
-
 import { mkdir, writeFile } from 'fs/promises'
 import { fetchHtml } from '../utils/fetchHtml.js'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const projectRoot = path.resolve(__dirname, '../..') // from /src/scripts/ to root
+const dirPath = path.resolve(projectRoot, 'dist/data') // ✅ now saving to dist/data
 
 /**
  * Entry point for team page downloader.
@@ -14,13 +15,12 @@ async function main(args) {
   const [teamCode, year] = args
 
   if (!teamCode || !year) {
-    console.error('❌ Usage: bun src/scripts/downloadHtml.js <TEAM> <YEAR>')
+    console.error('❌ Usage: bun run scripts/downloadHtml.js <TEAM> <YEAR>')
     process.exit(1)
   }
 
   const url = `https://www.baseball-reference.com/teams/${teamCode}/${year}.shtml`
-  const dirPath = `dist/data`
-  const outPath = `${dirPath}/${teamCode}-${year}.html`
+  const outPath = path.resolve(dirPath, `${teamCode}-${year}.html`)
 
   try {
     console.log(`📁 Ensuring directory: ${dirPath}`)

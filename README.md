@@ -6,3 +6,5 @@ A no-fillings bun starter project
 `bun test` - run unit tests
 
 `bun document` - generate docs for all comments in valid JSDoc format
+
+`bun run downloadHtml.js CHC 2025`
