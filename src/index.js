@@ -3,6 +3,9 @@
  */
 
 import { parseTables } from './utils/parseTables.js'
+import { parseStatTable } from './utils/statParser.js'
+import { normalizeBattingStats, normalizePitchingStats } from './utils/statNormalizer.js'
+import { buildRoster } from './core/rosterBuilder.js'
 
 /**
  * Logs a preview of a given HTMLTableElement.
@@ -48,6 +51,27 @@ async function main() {
     logTablePreview(batting, 'Batting')
     logTablePreview(pitching, 'Pitching')
     logTablePreview(fielding, 'Fielding')
+
+    const battingRaw = parseStatTable(batting)
+    const pitchingRaw = parseStatTable(pitching)
+
+    const batters = normalizeBattingStats(battingRaw)
+    const pitchers = normalizePitchingStats(pitchingRaw)
+
+    console.log('🎯 Normalized batting example:', batters.slice(0, 2))
+    console.log('🎯 Normalized pitching example:', pitchers.slice(0, 2))
+
+    // Automatically select the first 9 unique batters and 1 pitcher
+    const lineupIds = batters
+      .map(b => b.player_id)
+      .filter((id, i, arr) => id && arr.indexOf(id) === i)
+      .slice(0, 9)
+
+    const pitcherId = pitchers.find(p => p.player_id)?.player_id
+
+    const roster = buildRoster(lineupIds, pitcherId, batters, pitchers)
+
+    console.log('🏆 Built roster:', roster)
 
   } catch (err) {
     console.error('❌ Error loading team HTML:', err)
