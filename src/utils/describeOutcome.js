@@ -43,7 +43,7 @@ const outTypeWeights = {
   export function describeOutcome(outcome) {
     if (outcome === 'Out') {
       const type = randomWeightedChoice(outTypeWeights)
-      const fielder = randomWeightedChoice(outFielderByType[type])
+      const fielder = randomWeightedChoice(outFielderByType[/** @type {keyof typeof outFielderByType} */ (type)])
       return `${type} to ${fielder}`
     }
     return outcome

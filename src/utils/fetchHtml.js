@@ -25,6 +25,7 @@ export async function fetchHtml(url) {
     const html = await response.text()
     return html
   } catch (err) {
-    throw new Error(`Failed to fetch team page: ${err.message}`)
+    const msg = (err && typeof err === 'object' && 'message' in err) ? /** @type {any} */ (err).message : String(err);
+    throw new Error(`Failed to fetch team page: ${msg}`);
   }
 }

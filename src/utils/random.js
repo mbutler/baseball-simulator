@@ -9,5 +9,5 @@ export function randomWeightedChoice(weights) {
     for (const [key, weight] of Object.entries(weights)) {
       if ((r -= weight) <= 0) return key
     }
-    return Object.keys(weights).pop() // fallback
+    return Object.keys(weights).pop() || '';
   }

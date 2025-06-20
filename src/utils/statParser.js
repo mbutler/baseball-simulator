@@ -47,7 +47,7 @@ export function parseStatTable(table) {
   )
 
   const headerCells = Array.from(table.querySelectorAll('thead tr th')).map(
-    th => th.textContent.trim()
+    th => (th.textContent ?? '').trim()
   )
 
   const result = []
@@ -56,6 +56,7 @@ export function parseStatTable(table) {
     const cells = [row.querySelector('th'), ...row.querySelectorAll('td')]
     if (cells.length !== headerCells.length) continue
 
+    /** @type {Record<string, any>} */
     const stat = {}
 
     for (let i = 0; i < headerCells.length; i++) {
@@ -63,22 +64,22 @@ export function parseStatTable(table) {
       const cell = cells[i]
 
       if (i === 0) {
-        let name = cell.textContent.trim()
-        let link = cell.querySelector('a')
+        let name = cell?.textContent?.trim() || '';
+        let link = cell?.querySelector?.('a') || null;
         let id = extractPlayerId(link)
 
         // If cell is just a row number, get name/link from next <td>
         if (/^\d+$/.test(name)) {
           const altCell = row.querySelector('td')
-          name = altCell?.textContent.trim() || '(unknown)'
-          link = altCell?.querySelector('a')
+          name = altCell?.textContent?.trim() || '(unknown)'
+          link = altCell?.querySelector?.('a') || null;
           id = extractPlayerId(link) || id
         }
 
         stat.name = name
         stat.player_id = id || fallbackIdFromName(name)
       } else {
-        const text = cell.textContent.trim()
+        const text = cell?.textContent?.trim() || '';
         const num = Number(text.replace(/,/g, ''))
         stat[key] = isNaN(num) ? text : num
       }
@@ -87,5 +88,5 @@ export function parseStatTable(table) {
     result.push(stat)
   }
 
-  return result
+  return /** @type {import('./statParser.js').ParsedPlayer[]} */ (result);
 }

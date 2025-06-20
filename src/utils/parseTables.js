@@ -51,8 +51,8 @@ export function parseTables(html) {
   document.body.appendChild(container)
   container.innerHTML = html
 
-  const batting = container.querySelector('table#players_standard_batting')
-  const pitching = container.querySelector('table#players_standard_pitching')
+  const batting = /** @type {HTMLTableElement|null} */ (container.querySelector('table#players_standard_batting'))
+  const pitching = /** @type {HTMLTableElement|null} */ (container.querySelector('table#players_standard_pitching'))
 
   const commentBlocks = extractCommentBlocks(html)
   const fielding = parseTableFromComments(commentBlocks, 'players_standard_fielding')

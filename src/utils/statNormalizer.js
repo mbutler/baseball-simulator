@@ -46,7 +46,7 @@
 
 /**
  * Extracts and normalizes batting outcomes into rate-based stats for simulation use.
- * @param {Object[]} batters - Raw player batting stats
+ * @param {{ name: string, player_id: string, PA: any, AB: any, H: any, HR: any, BB: any, SO: any, SF?: any, HBP?: any, '2B'?: any, '3B'?: any }[]} batters
  * @returns {NormalizedBatter[]} Normalized batters with outcome probabilities and breakdowns
  */
 export function normalizeBattingStats(batters) {
@@ -89,7 +89,7 @@ export function normalizeBattingStats(batters) {
   
   /**
    * Extracts and normalizes pitcher stats for simulation use.
-   * @param {Object[]} pitchers - Raw player pitching stats
+   * @param {{ name: string, player_id: string, IP: any, TBF: any, H: any, HR: any, BB: any, SO: any, HBP?: any }[]} pitchers
    * @returns {NormalizedPitcher[]} Normalized pitchers with outcome rates
    */
   export function normalizePitchingStats(pitchers) {
