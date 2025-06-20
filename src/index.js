@@ -30,6 +30,7 @@ let awayMatchups = null;
 /** @type {import('./core/gameEngine.js').GameState | null} */
 let gameState = null;
 let lastRenderedInning = 1;
+let lastRenderedTop = true;
 
 // --- Utility: Hardcoded list of available teams ---
 async function fetchAvailableTeams() {
@@ -123,18 +124,25 @@ function renderGameState() {
 }
 
 /**
- * @param {{ batterName: string, outcome: string } | null} result
- * @param {boolean} clearList
+ * @param {{ batterName: string, outcome: string, outs: number, score: number[], bases: number[], inning: number, top: boolean } | null} result
+ * @param {boolean} isNewHalfInning
  */
-function renderAtBatResult(result, clearList = false) {
+function renderAtBatResult(result, isNewHalfInning = false) {
   if (!atbatResultContainer) return;
-  if (clearList || !result) {
-    atbatResultContainer.innerHTML = '';
-    return;
+  if (!result) return;
+  // Insert inning/half-inning label if needed
+  if (isNewHalfInning) {
+    const labelDiv = document.createElement('div');
+    labelDiv.style.marginTop = '1em';
+    labelDiv.style.fontWeight = 'bold';
+    labelDiv.textContent = `Inning ${result.inning} - ${result.top ? 'Top' : 'Bottom'}`;
+    atbatResultContainer.appendChild(labelDiv);
   }
+  // Format base state
+  const basesStr = ['1B','2B','3B'].map((b,i) => result.bases[i] ? b : '').filter(Boolean).join(', ') || 'Empty';
   // Append new result as a div
   const div = document.createElement('div');
-  div.innerHTML = `<strong>Batter:</strong> ${result.batterName}<br><strong>Result:</strong> ${result.outcome}`;
+  div.innerHTML = `<strong>Batter:</strong> ${result.batterName}<br><strong>Result:</strong> ${result.outcome}<br><strong>Outs:</strong> ${result.outs} &nbsp; <strong>Score:</strong> Away ${result.score[0]} – Home ${result.score[1]} &nbsp; <strong>Bases:</strong> ${basesStr}`;
   atbatResultContainer.appendChild(div);
 }
 
@@ -161,7 +169,7 @@ function handleNextAtBat() {
   const result = simulateAtBat(awayMatchups, homeMatchups, state);
 
   let transitionMsg = '';
-  let clearResults = false;
+  let isNewHalfInning = false;
   // Handle inning/half-inning transitions
   if (state.outs >= 3) {
     state.outs = 0;
@@ -169,22 +177,30 @@ function handleNextAtBat() {
     if (state.top) {
       state.top = false; // Switch to bottom
       transitionMsg = 'End of top half. Switching to bottom of inning.';
+      isNewHalfInning = true;
     } else {
       state.top = true; // Switch to top of next inning
       state.inning++;
       transitionMsg = 'End of inning. Advancing to next inning.';
-      clearResults = true;
+      isNewHalfInning = true;
     }
+  } else if (state.inning !== lastRenderedInning || state.top !== lastRenderedTop) {
+    isNewHalfInning = true;
   }
 
-  if (clearResults || state.inning !== lastRenderedInning) {
-    renderAtBatResult(null, true);
+  if (isNewHalfInning) {
     lastRenderedInning = state.inning;
+    lastRenderedTop = state.top;
   }
   renderAtBatResult({
     batterName: batter.name,
-    outcome: result.outcome + (transitionMsg ? `<br><em>${transitionMsg}</em>` : '')
-  });
+    outcome: result.outcome + (transitionMsg ? `<br><em>${transitionMsg}</em>` : ''),
+    outs: state.outs,
+    score: [...state.score],
+    bases: [...state.bases],
+    inning: state.inning,
+    top: state.top
+  }, isNewHalfInning);
   renderGameState();
 }
 
