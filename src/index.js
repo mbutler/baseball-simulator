@@ -59,7 +59,8 @@ async function fetchAvailableTeams() {
   return [
     "CHC-2025.html",
     "MIL-2025.html",
-    "PIT-2025.html"
+    "PIT-2025.html",
+    "SEA-2025.html"
   ];
 }
 
