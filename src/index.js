@@ -144,6 +144,7 @@ function renderAtBatResult(result, isNewHalfInning = false) {
   const div = document.createElement('div');
   div.innerHTML = `<strong>Batter:</strong> ${result.batterName}<br><strong>Result:</strong> ${result.outcome}<br><strong>Outs:</strong> ${result.outs} &nbsp; <strong>Score:</strong> Away ${result.score[0]} – Home ${result.score[1]} &nbsp; <strong>Bases:</strong> ${basesStr}`;
   atbatResultContainer.appendChild(div);
+  atbatResultContainer.appendChild(document.createElement('br'));
 }
 
 // --- Start a new game ---
@@ -168,6 +169,17 @@ function handleNextAtBat() {
   const batter = roster.lineup[batterIdx];
   const result = simulateAtBat(awayMatchups, homeMatchups, state);
 
+  // Always log the at-bat result first (before transition)
+  renderAtBatResult({
+    batterName: batter.name,
+    outcome: result.outcome,
+    outs: state.outs,
+    score: [...state.score],
+    bases: [...state.bases],
+    inning: state.inning,
+    top: state.top
+  });
+
   let transitionMsg = '';
   let isNewHalfInning = false;
   // Handle inning/half-inning transitions
@@ -184,23 +196,25 @@ function handleNextAtBat() {
       transitionMsg = 'End of inning. Advancing to next inning.';
       isNewHalfInning = true;
     }
-  } else if (state.inning !== lastRenderedInning || state.top !== lastRenderedTop) {
-    isNewHalfInning = true;
   }
 
+  // If a transition occurred, log the transition message and insert the new inning/half-inning label for the next at-bat
   if (isNewHalfInning) {
-    lastRenderedInning = state.inning;
-    lastRenderedTop = state.top;
+    // Log the transition message as a divider
+    if (atbatResultContainer) {
+      const div = document.createElement('div');
+      div.innerHTML = `<em>${transitionMsg}</em>`;
+      atbatResultContainer.appendChild(div);
+      // Insert the new inning/half-inning label for the next at-bat
+      lastRenderedInning = state.inning;
+      lastRenderedTop = state.top;
+      const labelDiv = document.createElement('div');
+      labelDiv.style.marginTop = '1em';
+      labelDiv.style.fontWeight = 'bold';
+      labelDiv.textContent = `Inning ${state.inning} - ${state.top ? 'Top' : 'Bottom'}`;
+      atbatResultContainer.appendChild(labelDiv);
+    }
   }
-  renderAtBatResult({
-    batterName: batter.name,
-    outcome: result.outcome + (transitionMsg ? `<br><em>${transitionMsg}</em>` : ''),
-    outs: state.outs,
-    score: [...state.score],
-    bases: [...state.bases],
-    inning: state.inning,
-    top: state.top
-  }, isNewHalfInning);
   renderGameState();
 }
 
