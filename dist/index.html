@@ -1,12 +1,103 @@
 <!DOCTYPE html>
-<html>
-  <head lang="en">
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title></title>
-  </head>
-  <body>
-    <script src="js/bundle.js"></script>
-  </body>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baseball Simulator</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f8f9fa;
+      margin: 0;
+      padding: 0;
+    }
+    #simulator-app {
+      max-width: 700px;
+      margin: 2em auto;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px #0001;
+      padding: 2em;
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 2em;
+      text-align: center;
+    }
+    label {
+      margin-right: 0.5em;
+    }
+    select, button {
+      margin-right: 1em;
+      font-size: 1em;
+      padding: 0.2em 0.5em;
+    }
+    #status {
+      margin-top: 1em;
+      color: #555;
+      min-height: 1.5em;
+    }
+    .section {
+      margin-top: 2em;
+    }
+    .lineup-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5em;
+    }
+    .lineup-table th, .lineup-table td {
+      border: 1px solid #ddd;
+      padding: 0.3em 0.6em;
+      text-align: left;
+    }
+    .game-state {
+      margin-top: 1.5em;
+      font-size: 1.1em;
+      background: #f3f6fa;
+      padding: 1em;
+      border-radius: 6px;
+    }
+    #next-atbat-btn {
+      margin-top: 1em;
+      font-size: 1.1em;
+      padding: 0.5em 1.2em;
+    }
+  </style>
+</head>
+<body>
+  <div id="simulator-app">
+    <h1>Baseball Simulator</h1>
+    <div>
+      <label for="home-team-select">Home Team:</label>
+      <select id="home-team-select"></select>
+      <label for="away-team-select">Away Team:</label>
+      <select id="away-team-select"></select>
+      <button id="load-teams-btn">Reload Teams</button>
+    </div>
+    <div id="status"></div>
+
+    <div class="section" id="lineups-section">
+      <h2>Lineups</h2>
+      <div id="lineups-container">
+        <!-- Lineups for both teams will be rendered here -->
+      </div>
+    </div>
+
+    <div class="section" id="game-section">
+      <h2>Game State</h2>
+      <div class="game-state" id="game-state-container">
+        <!-- Game state (inning, outs, bases, score, etc.) will be rendered here -->
+      </div>
+      <button id="next-atbat-btn" style="display:none;">Next At-Bat</button>
+    </div>
+
+    <div class="section" id="atbat-section">
+      <h2>At-Bat Result</h2>
+      <div id="atbat-result-container">
+        <!-- At-bat outcome and details will be rendered here -->
+      </div>
+    </div>
+  </div>
+  <script type="module" src="../src/index.js"></script>
+</body>
 </html>
