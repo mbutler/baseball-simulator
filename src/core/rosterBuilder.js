@@ -1,11 +1,21 @@
 /**
+ * @fileoverview Builds a playable team roster from selected player IDs and full stat pools.
+ * @module core/rosterBuilder
+ */
+
+/**
+ * @typedef {import('./probabilityModel.js').NormalizedBatter} NormalizedBatter
+ * @typedef {import('./probabilityModel.js').NormalizedPitcher} NormalizedPitcher
+ */
+
+/**
  * Builds a playable team roster from selected player IDs and full stat pools.
- * @param {string[]} lineupIds - 9 player_ids for batters
+ * @param {string[]} lineupIds - Array of 9 player_ids for batters
  * @param {string} pitcherId - player_id for starting pitcher
- * @param {Object[]} batters - normalized batters from statNormalizer
- * @param {Object[]} pitchers - normalized pitchers from statNormalizer
- * @returns {{ lineup: Object[], pitcher: Object }}
- * @throws if any player is missing or duplicated
+ * @param {NormalizedBatter[]} batters - Array of normalized batters
+ * @param {NormalizedPitcher[]} pitchers - Array of normalized pitchers
+ * @returns {{ lineup: NormalizedBatter[], pitcher: NormalizedPitcher }}
+ * @throws {Error} If any player is missing or duplicated
  */
 export function buildRoster(lineupIds, pitcherId, batters, pitchers) {
     const lineup = lineupIds.map(pid => {

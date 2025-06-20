@@ -1,11 +1,19 @@
 /**
  * @fileoverview Converts a Baseball Reference stats table into structured player objects.
+ * @module utils/statParser
+ */
+
+/**
+ * @typedef {Object} ParsedPlayer
+ * @property {string} name - Player's name
+ * @property {string} player_id - Player's unique ID (from link or fallback)
+ * @property {Object.<string, number|string>} [stats] - Additional stat fields (e.g., PA, HR, Team, etc.)
  */
 
 /**
  * Extracts Baseball Reference player ID from an anchor tag.
- * @param {HTMLAnchorElement|null} link
- * @returns {string|null}
+ * @param {HTMLAnchorElement|null} link - Anchor element with player link
+ * @returns {string|null} Player ID or null if not found
  */
 function extractPlayerId(link) {
   if (!link || !link.href) return null
@@ -15,8 +23,8 @@ function extractPlayerId(link) {
 
 /**
  * Generates a fallback ID from player name if link is missing.
- * @param {string} name
- * @returns {string}
+ * @param {string} name - Player's name
+ * @returns {string} Fallback player ID
  */
 function fallbackIdFromName(name) {
   return name
@@ -28,8 +36,8 @@ function fallbackIdFromName(name) {
 /**
  * Converts a Baseball Reference stats table to an array of player objects.
  * Handles cases where <th> contains row numbers, and name is in first <td>.
- * @param {HTMLTableElement} table
- * @returns {Object[]} Parsed player stat rows
+ * @param {HTMLTableElement} table - Table element to parse
+ * @returns {ParsedPlayer[]} Parsed player stat rows
  */
 export function parseStatTable(table) {
   if (!table) return []

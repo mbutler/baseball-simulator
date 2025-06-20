@@ -12,6 +12,20 @@ function assertClose(actual, expected, tolerance = 1e-3) {
   }
 }
 
+function assertAllKeysPresent(obj, keys) {
+  for (const key of keys) {
+    if (!(key in obj)) throw new Error(`Missing key: ${key}`)
+  }
+}
+
+function assertAllInRange(obj, min, max) {
+  for (const [k, v] of Object.entries(obj)) {
+    if (typeof v !== 'number' || v < min || v > max) {
+      throw new Error(`Probability for ${k} out of range: ${v}`)
+    }
+  }
+}
+
 function runTests() {
   const mockLineup = Array.from({ length: 9 }, (_, i) => ({
     player_id: `batter${i + 1}`,
@@ -66,4 +80,68 @@ function runTests() {
   console.log('✅ All matchupPreparer tests passed.')
 }
 
+function runEdgeCaseTests() {
+  // Fewer than 9 batters
+  const shortLineup = [
+    { player_id: 'b1', PA: 100, stats: {}, rates: {} },
+    { player_id: 'b2', PA: 100, stats: {}, rates: {} }
+  ]
+  const pitcher = { player_id: 'p1', rates: {} }
+  let matchups = prepareMatchups({ lineup: shortLineup, pitcher })
+  if (matchups.length !== 2) throw new Error('Short lineup: wrong matchup count')
+  for (const m of matchups) {
+    assertAllKeysPresent(m.probabilities, ['K', 'BB', 'HBP', 'HR', '1B', '2B', '3B', 'Out'])
+    assertAllInRange(m.probabilities, 0, 1)
+  }
+
+  // More than 9 batters
+  const longLineup = Array.from({ length: 12 }, (_, i) => ({ player_id: `b${i+1}`, PA: 100, stats: {}, rates: {} }))
+  matchups = prepareMatchups({ lineup: longLineup, pitcher })
+  if (matchups.length !== 12) throw new Error('Long lineup: wrong matchup count')
+
+  // Empty lineup
+  matchups = prepareMatchups({ lineup: [], pitcher })
+  if (matchups.length !== 0) throw new Error('Empty lineup: should return empty array')
+
+  // Malformed/empty roster
+  try {
+    prepareMatchups({})
+  } catch (e) {
+    // Acceptable if it throws
+  }
+  try {
+    prepareMatchups()
+  } catch (e) {
+    // Acceptable if it throws
+  }
+
+  // Batters with missing stats/rates
+  const weirdLineup = [
+    { player_id: 'b1' },
+    { player_id: 'b2', stats: { HBP: 1 } },
+    { player_id: 'b3', rates: { kRate: 0.1 } }
+  ]
+  matchups = prepareMatchups({ lineup: weirdLineup, pitcher })
+  for (const m of matchups) {
+    assertAllKeysPresent(m.probabilities, ['K', 'BB', 'HBP', 'HR', '1B', '2B', '3B', 'Out'])
+    assertAllInRange(m.probabilities, 0, 1)
+  }
+
+  // Pitcher with missing rates
+  const batter = { player_id: 'b1', PA: 100, stats: {}, rates: {} }
+  matchups = prepareMatchups({ lineup: [batter], pitcher: { player_id: 'p1' } })
+  assertAllKeysPresent(matchups[0].probabilities, ['K', 'BB', 'HBP', 'HR', '1B', '2B', '3B', 'Out'])
+
+  // Duplicate player IDs
+  const dupLineup = [
+    { player_id: 'dup', PA: 100, stats: {}, rates: {} },
+    { player_id: 'dup', PA: 100, stats: {}, rates: {} }
+  ]
+  matchups = prepareMatchups({ lineup: dupLineup, pitcher })
+  if (matchups.length !== 2) throw new Error('Duplicate IDs: wrong matchup count')
+
+  console.log('✅ All matchupPreparer edge case tests passed.')
+}
+
 runTests()
+runEdgeCaseTests()

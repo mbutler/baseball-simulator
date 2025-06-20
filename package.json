@@ -8,5 +8,8 @@
   },
   "devDependencies": {
     "documentation": "^14.0.2"
+  },
+  "dependencies": {
+    "jsdom": "^26.1.0"
   }
 }

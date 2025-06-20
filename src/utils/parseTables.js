@@ -1,12 +1,13 @@
 /**
  * @fileoverview Parses Baseball Reference stat tables (batting, pitching, fielding).
  * Uses both direct DOM and comment block parsing.
+ * @module utils/parseTables
  */
 
 /**
  * Extracts all HTML comment blocks from a full HTML string.
- * @param {string} html
- * @returns {string[]} array of comment block contents
+ * @param {string} html - Raw HTML string
+ * @returns {string[]} Array of comment block contents
  */
 function extractCommentBlocks(html) {
   const commentRegex = /<!--([\s\S]*?)-->/g
@@ -22,7 +23,7 @@ function extractCommentBlocks(html) {
  * Searches comment blocks for a specific table ID and parses it to DOM.
  * @param {string[]} blocks - Comment blocks
  * @param {string} tableId - ID of table to find
- * @returns {HTMLTableElement|null}
+ * @returns {HTMLTableElement|null} The found table element or null
  */
 function parseTableFromComments(blocks, tableId) {
   const parser = new DOMParser()
@@ -42,7 +43,7 @@ function parseTableFromComments(blocks, tableId) {
  *   batting: HTMLTableElement|null,
  *   pitching: HTMLTableElement|null,
  *   fielding: HTMLTableElement|null
- * }}
+ * }} Object with batting, pitching, and fielding tables (may be null)
  */
 export function parseTables(html) {
   const container = document.createElement('div')

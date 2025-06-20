@@ -1,11 +1,53 @@
 /**
  * @fileoverview Computes derived statistics and normalization for batter and pitcher stat tables.
+ * @module utils/statNormalizer
+ */
+
+/**
+ * @typedef {Object} NormalizedBatter
+ * @property {string} name
+ * @property {string} player_id
+ * @property {number} PA
+ * @property {Object} stats
+ * @property {number} stats.H
+ * @property {number} stats.HR
+ * @property {number} stats.BB
+ * @property {number} stats.SO
+ * @property {number} stats.SF
+ * @property {number} stats.HBP
+ * @property {number} stats.singles
+ * @property {number} stats.doubles
+ * @property {number} stats.triples
+ * @property {Object} rates
+ * @property {number|null} rates.kRate
+ * @property {number|null} rates.bbRate
+ * @property {number|null} rates.hrRate
+ * @property {number|null} rates.BABIP
+ */
+
+/**
+ * @typedef {Object} NormalizedPitcher
+ * @property {string} name
+ * @property {string} player_id
+ * @property {number} TBF
+ * @property {Object} stats
+ * @property {number} stats.IP
+ * @property {number} stats.H
+ * @property {number} stats.HR
+ * @property {number} stats.BB
+ * @property {number} stats.SO
+ * @property {number} stats.HBP
+ * @property {Object} rates
+ * @property {number|null} rates.kRate
+ * @property {number|null} rates.bbRate
+ * @property {number|null} rates.hrRate
+ * @property {number|null} rates.BABIP
  */
 
 /**
  * Extracts and normalizes batting outcomes into rate-based stats for simulation use.
  * @param {Object[]} batters - Raw player batting stats
- * @returns {Object[]} Normalized batters with outcome probabilities and breakdowns
+ * @returns {NormalizedBatter[]} Normalized batters with outcome probabilities and breakdowns
  */
 export function normalizeBattingStats(batters) {
     return batters.map(b => {
@@ -48,7 +90,7 @@ export function normalizeBattingStats(batters) {
   /**
    * Extracts and normalizes pitcher stats for simulation use.
    * @param {Object[]} pitchers - Raw player pitching stats
-   * @returns {Object[]} Normalized pitchers with outcome rates
+   * @returns {NormalizedPitcher[]} Normalized pitchers with outcome rates
    */
   export function normalizePitchingStats(pitchers) {
     return pitchers.map(p => {
