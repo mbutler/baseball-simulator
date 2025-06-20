@@ -73,6 +73,8 @@
       <label for="away-team-select">Away Team:</label>
       <select id="away-team-select"></select>
       <button id="load-teams-btn">Reload Teams</button>
+      <button id="customize-home-lineup-btn">Customize Home Lineup</button>
+      <button id="customize-away-lineup-btn">Customize Away Lineup</button>
     </div>
     <div id="status"></div>
 
@@ -95,6 +97,28 @@
       <h2>At-Bat Result</h2>
       <div id="atbat-result-container">
         <!-- At-bat outcome and details will be rendered here -->
+      </div>
+    </div>
+
+    <!-- Modal for lineup customization -->
+    <div id="custom-lineup-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#0008; z-index:1000; align-items:center; justify-content:center;">
+      <div style="background:#fff; padding:2em; border-radius:8px; max-width:500px; margin:auto; position:relative;">
+        <button id="close-lineup-modal" style="position:absolute; top:0.5em; right:0.5em;">&times;</button>
+        <h2 id="lineup-modal-title">Customize Lineup</h2>
+        <form id="custom-lineup-form">
+          <div>
+            <h3>Batting Order</h3>
+            <ol id="batting-order-list"></ol>
+          </div>
+          <div style="margin-top:1em;">
+            <h3>Starting Pitcher</h3>
+            <select id="pitcher-select"></select>
+          </div>
+          <div style="margin-top:1.5em;">
+            <button type="submit" id="save-lineup-btn">Use This Lineup</button>
+          </div>
+        </form>
+        <div id="lineup-error" style="color:red; margin-top:1em;"></div>
       </div>
     </div>
   </div>

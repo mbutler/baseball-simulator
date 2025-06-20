@@ -15,9 +15,20 @@ const lineupsContainer = document.getElementById('lineups-container');
 const gameStateContainer = document.getElementById('game-state-container');
 const nextAtBatBtn = document.getElementById('next-atbat-btn');
 const atbatResultContainer = document.getElementById('atbat-result-container');
+const customizeHomeBtn = document.getElementById('customize-home-lineup-btn');
+const customizeAwayBtn = document.getElementById('customize-away-lineup-btn');
+const lineupModal = document.getElementById('custom-lineup-modal');
+const closeLineupModalBtn = document.getElementById('close-lineup-modal');
+const lineupModalTitle = document.getElementById('lineup-modal-title');
+const customLineupForm = document.getElementById('custom-lineup-form');
+const battingOrderList = document.getElementById('batting-order-list');
+const pitcherSelect = document.getElementById('pitcher-select');
+const lineupError = document.getElementById('lineup-error');
 
 // --- Game State ---
+/** @type {{ batters: any[]; pitchers: any[] } | null} */
 let loadedHome = null;
+/** @type {{ batters: any[]; pitchers: any[] } | null} */
 let loadedAway = null;
 /** @type {{ lineup: any[]; pitcher: any; } | null} */
 let homeRoster = null;
@@ -31,6 +42,16 @@ let awayMatchups = null;
 let gameState = null;
 let lastRenderedInning = 1;
 let lastRenderedTop = true;
+/** @type {string[] | null} */
+let customHomeLineup = null;
+/** @type {string | null} */
+let customHomePitcher = null;
+/** @type {string[] | null} */
+let customAwayLineup = null;
+/** @type {string | null} */
+let customAwayPitcher = null;
+/** @type {'home' | 'away' | null} */
+let editingTeam = null;
 
 // --- Utility: Hardcoded list of available teams ---
 async function fetchAvailableTeams() {
@@ -57,26 +78,28 @@ async function loadTeamFile(filename) {
 }
 
 /**
- * @param {{ batters: any[], pitchers: any[] } | null | undefined} home
- * @param {{ batters: any[], pitchers: any[] } | null | undefined} away
+ * @param {{ batters?: any[], pitchers?: any[], lineup?: any[], pitcher?: any } | null | undefined} home
+ * @param {{ batters?: any[], pitchers?: any[], lineup?: any[], pitcher?: any } | null | undefined} away
  */
 function renderLineups(home, away) {
   if (!lineupsContainer) return;
   lineupsContainer.innerHTML = '';
   /**
-   * @param {{ batters: any[], pitchers: any[] } | null | undefined} team
+   * @param {{ batters?: any[], pitchers?: any[], lineup?: any[], pitcher?: any } | null | undefined} team
    * @param {string} label
    */
   const makeTable = (team, label) => {
     if (!team) return `<div><strong>${label}:</strong> Not loaded</div>`;
-    const pitcher = (team.pitchers && team.pitchers[0]) || { name: 'N/A' };
+    // Prefer custom lineup/pitcher if present
+    const batters = team.lineup || team.batters || [];
+    const pitcher = team.pitcher || (team.pitchers && team.pitchers[0]) || { name: 'N/A' };
     return `
       <div style="margin-bottom:1.5em;">
         <strong>${label} Lineup</strong>
         <table class="lineup-table">
           <thead><tr><th>#</th><th>Name</th><th>PA</th></tr></thead>
           <tbody>
-            ${(team.batters || []).slice(0, 9).map((b, i) => `<tr><td>${i+1}</td><td>${b.name || ''}</td><td>${b.PA || ''}</td></tr>`).join('')}
+            ${(batters || []).slice(0, 9).map((b, i) => `<tr><td>${i+1}</td><td>${b.name || ''}</td><td>${b.PA || ''}</td></tr>`).join('')}
           </tbody>
         </table>
         <div><strong>Pitcher:</strong> ${pitcher.name}</div>
@@ -232,10 +255,25 @@ async function loadAndDisplayLineups() {
     ]);
     loadedHome = home;
     loadedAway = away;
-    // Default: first 9 batters, first pitcher
-    homeRoster = home && home.batters && home.pitchers ? buildRoster((home.batters.slice(0,9).map(b=>b.player_id)), home.pitchers[0].player_id, /** @type {any[]} */(home.batters), /** @type {any[]} */(home.pitchers)) : null;
-    awayRoster = away && away.batters && away.pitchers ? buildRoster((away.batters.slice(0,9).map(b=>b.player_id)), away.pitchers[0].player_id, /** @type {any[]} */(away.batters), /** @type {any[]} */(away.pitchers)) : null;
-    renderLineups(home, away);
+    // Use custom lineup if set, else default
+    homeRoster = home && home.batters && home.pitchers
+      ? buildRoster(
+          customHomeLineup && customHomeLineup.length === 9 ? customHomeLineup : home.batters.slice(0,9).map(b=>b.player_id),
+          customHomePitcher || home.pitchers[0].player_id,
+          /** @type {any[]} */(home.batters),
+          /** @type {any[]} */(home.pitchers)
+        )
+      : null;
+    awayRoster = away && away.batters && away.pitchers
+      ? buildRoster(
+          customAwayLineup && customAwayLineup.length === 9 ? customAwayLineup : away.batters.slice(0,9).map(b=>b.player_id),
+          customAwayPitcher || away.pitchers[0].player_id,
+          /** @type {any[]} */(away.batters),
+          /** @type {any[]} */(away.pitchers)
+        )
+      : null;
+    // Render the actual lineups that will be used in the game
+    renderLineups(homeRoster, awayRoster);
     statusDiv.textContent = 'Lineups loaded. Ready to simulate!';
     startGame();
   } catch (err) {
@@ -278,8 +316,108 @@ if (loadTeamsBtn) {
 if (homeSelect) homeSelect.addEventListener('change', loadAndDisplayLineups);
 if (awaySelect) awaySelect.addEventListener('change', loadAndDisplayLineups);
 if (nextAtBatBtn) nextAtBatBtn.addEventListener('click', handleNextAtBat);
+if (customizeHomeBtn) {
+  customizeHomeBtn.addEventListener('click', () => {
+    if (!loadedHome) return;
+    showLineupModal('home', loadedHome.batters, loadedHome.pitchers, customHomeLineup, customHomePitcher);
+  });
+}
+if (customizeAwayBtn) {
+  customizeAwayBtn.addEventListener('click', () => {
+    if (!loadedAway) return;
+    showLineupModal('away', loadedAway.batters, loadedAway.pitchers, customAwayLineup, customAwayPitcher);
+  });
+}
+if (closeLineupModalBtn) {
+  closeLineupModalBtn.addEventListener('click', () => {
+    if (lineupModal) lineupModal.style.display = 'none';
+  });
+}
+if (customLineupForm) {
+  customLineupForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!battingOrderList || !pitcherSelect) return;
+    const lineup = [];
+    const selects = battingOrderList.querySelectorAll('select');
+    for (const sel of selects) {
+      if (!sel.value) {
+        if (lineupError) lineupError.textContent = 'Please select a player for every lineup slot.';
+        return;
+      }
+      lineup.push(sel.value);
+    }
+    // Check for duplicates
+    if (new Set(lineup).size !== lineup.length) {
+      if (lineupError) lineupError.textContent = 'No duplicate players allowed in the lineup.';
+      return;
+    }
+    const pitcher = /** @type {HTMLSelectElement} */(pitcherSelect).value;
+    if (!pitcher) {
+      if (lineupError) lineupError.textContent = 'Please select a starting pitcher.';
+      return;
+    }
+    if (lineup.includes(pitcher)) {
+      if (lineupError) lineupError.textContent = 'Pitcher cannot also be in the batting lineup.';
+      return;
+    }
+    // Save
+    if (editingTeam === 'home') {
+      customHomeLineup = lineup;
+      customHomePitcher = pitcher;
+    } else {
+      customAwayLineup = lineup;
+      customAwayPitcher = pitcher;
+    }
+    if (lineupModal) lineupModal.style.display = 'none';
+    // Reset game state and matchups so new lineup is used
+    homeMatchups = null;
+    awayMatchups = null;
+    gameState = null;
+    lastRenderedInning = 1;
+    lastRenderedTop = true;
+    if (atbatResultContainer) atbatResultContainer.innerHTML = '';
+    // Re-render lineups to reflect custom lineup (use homeRoster/awayRoster)
+    renderLineups(homeRoster, awayRoster);
+    // Re-render lineups and restart game with new custom lineup
+    loadAndDisplayLineups();
+  });
+}
 
 // Auto-load on page load
 window.addEventListener('DOMContentLoaded', () => {
   populateTeamDropdowns();
 });
+
+/**
+ * @param {'home' | 'away'} team
+ * @param {any[]} batters
+ * @param {any[]} pitchers
+ * @param {string[] | null} currentLineup
+ * @param {string | null} currentPitcher
+ */
+function showLineupModal(team, batters, pitchers, currentLineup, currentPitcher) {
+  editingTeam = team;
+  if (!lineupModal || !lineupModalTitle || !battingOrderList || !pitcherSelect) return;
+  lineupModalTitle.textContent = `Customize ${team === 'home' ? 'Home' : 'Away'} Lineup`;
+  if (lineupError) lineupError.textContent = '';
+  lineupModal.style.display = 'flex';
+
+  // Batting order dropdowns
+  battingOrderList.innerHTML = '';
+  for (let i = 0; i < 9; i++) {
+    const li = document.createElement('li');
+    const select = document.createElement('select');
+    select.name = `batter${i}`;
+    select.required = true;
+    select.innerHTML = '<option value="">-- Select --</option>' +
+      batters.map(b => `<option value="${b.player_id}">${b.name} (${b.PA} PA)</option>`).join('');
+    if (currentLineup && currentLineup[i]) select.value = currentLineup[i];
+    li.appendChild(select);
+    battingOrderList.appendChild(li);
+  }
+
+  // Pitcher dropdown
+  pitcherSelect.innerHTML = '<option value="">-- Select --</option>' +
+    pitchers.map(p => `<option value="${p.player_id}">${p.name} (${p.stats && p.stats.IP ? p.stats.IP : ''} IP)</option>`).join('');
+  if (currentPitcher) /** @type {HTMLSelectElement} */(pitcherSelect).value = currentPitcher;
+}
