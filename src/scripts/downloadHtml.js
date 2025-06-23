@@ -34,8 +34,9 @@ async function main(args) {
 
     console.log(`✅ Done! HTML saved to ${outPath}`)
   } catch (err) {
-    console.error('❌ Failed to fetch/save:', err.message)
+    console.error('❌ Failed to fetch/save:', (err instanceof Error ? err.message : String(err)))
   }
 }
 
+// @ts-expect-error Bun is provided by the Bun runtime
 main(Bun.argv.slice(2))

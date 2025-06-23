@@ -191,7 +191,7 @@ function handleNextAtBat() {
   if (!roster) return;
   const batterIdx = state.lineupIndices[teamIndex] % (roster.lineup.length);
   const batter = roster.lineup[batterIdx];
-  const result = simulateAtBat(awayMatchups, homeMatchups, state);
+  const result = simulateAtBat(awayMatchups, homeMatchups, state, [], []);
 
   // Always log the at-bat result first (before transition)
   renderAtBatResult({
