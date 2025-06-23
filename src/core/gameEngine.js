@@ -109,6 +109,7 @@ export function simulateAtBat(awayMatchups, homeMatchups, state, awayFielders, h
   let fielder = undefined
   let fielderPosition = ''
   let errorOccurred = false
+  let doublePlayOccurred = false;
 
   // If ball in play (not K, BB, HBP, HR), try to extract fielder position from description
   if (outcome === 'Out') {
@@ -133,6 +134,28 @@ export function simulateAtBat(awayMatchups, homeMatchups, state, awayFielders, h
           errorOccurred = true
         }
       }
+    }
+  }
+
+  // Double play logic: Only for groundouts, runner on first, <2 outs
+  if (
+    outcome === 'Out' &&
+    /^Groundout to [A-Z0-9]+$/.test(descriptiveOutcome) &&
+    state.outs < 2 &&
+    state.bases[0] === 1
+  ) {
+    // 25% chance for double play
+    if (Math.random() < 0.25) {
+      doublePlayOccurred = true;
+      // Remove runner on first
+      state.bases[0] = 0;
+      // Increment outs by 2, but cap at 3
+      state.outs = Math.min(state.outs + 2, 3);
+      return {
+        batter_id: matchup.batter_id,
+        outcome: 'Grounded into double play',
+        ...(fielder ? { fielder, fielderPosition } : {})
+      };
     }
   }
 
