@@ -127,3 +127,29 @@ export function normalizeBattingStats(batters) {
     })
   }
   
+  /**
+   * Extracts and normalizes fielding stats for simulation use.
+   * @param {{ name: string, player_id: string, Pos: any, G: any, Inn: any, PO: any, A: any, E: any, DP?: any, FP?: any, RF?: any, TZ?: any }[]} fielders
+   * @returns {Object[]} Normalized fielders with defensive stats
+   */
+  export function normalizeFieldingStats(fielders) {
+    return fielders.map(f => {
+      return {
+        name: f.name,
+        player_id: f.player_id,
+        position: f.Pos || '',
+        stats: {
+          G: Number(f.G) || 0,
+          Inn: Number(f.Inn) || 0,
+          PO: Number(f.PO) || 0,
+          A: Number(f.A) || 0,
+          E: Number(f.E) || 0,
+          DP: Number(f.DP) || 0,
+          FP: typeof f.FP === 'string' ? Number(f.FP) : (typeof f.FP === 'number' ? f.FP : null),
+          RF: typeof f.RF === 'string' ? Number(f.RF) : (typeof f.RF === 'number' ? f.RF : null),
+          TZ: typeof f.TZ === 'string' ? Number(f.TZ) : (typeof f.TZ === 'number' ? f.TZ : null),
+        }
+      }
+    })
+  }
+  

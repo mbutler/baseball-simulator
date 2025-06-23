@@ -47,6 +47,8 @@ function runTests() {
       away,
       home,
       testState,
+      [],
+      [],
       () => forcedOutcome, // mock randomWeightedChoice
       () => forcedDescription // mock describeOutcome
     )
@@ -89,6 +91,8 @@ function runTests() {
     away,
     home,
     testState,
+    [],
+    [],
     () => 'BB',
     () => 'BB'
   )
@@ -101,6 +105,8 @@ function runTests() {
     away,
     home,
     testState,
+    [],
+    [],
     () => '1B',
     () => '1B'
   )
@@ -119,6 +125,8 @@ function runTests() {
     nineBatters,
     home,
     testState,
+    [],
+    [],
     () => 'Out',
     () => 'Out'
   )
@@ -127,6 +135,8 @@ function runTests() {
     nineBatters,
     home,
     testState,
+    [],
+    [],
     () => 'Out',
     () => 'Out'
   )

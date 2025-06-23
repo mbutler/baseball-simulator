@@ -17,6 +17,12 @@ import { describeOutcome } from '../utils/describeOutcome.js'
  */
 
 /**
+ * @typedef {Object} Fielder
+ * @property {string} position
+ * @property {Record<string, number>} stats
+ */
+
+/**
  * Initialize game state for two teams.
  * @returns {GameState} Initial game state object
  */
@@ -76,16 +82,22 @@ function advanceRunners(bases, outcome) {
  * @param {import('./matchupPreparer.js').Matchup[]} awayMatchups - Array of matchup objects for the away team
  * @param {import('./matchupPreparer.js').Matchup[]} homeMatchups - Array of matchup objects for the home team
  * @param {GameState} state - The current game state (mutated in place)
+ * @param {Fielder[]} awayFielders - Array of normalized fielders for the away team
+ * @param {Fielder[]} homeFielders - Array of normalized fielders for the home team
  * @param {function(Object): string} [randomFn] - Optional: function to pick outcome, defaults to randomWeightedChoice
  * @param {function(string): string} [describeFn] - Optional: function to describe outcome, defaults to describeOutcome
- * @returns {{ batter_id: string, outcome: string }} Object with batter_id and outcome description
+ * @returns {{ batter_id: string, outcome: string, fielder?: Fielder, fielderPosition?: string }} Object with batter_id, outcome description, and (if applicable) fielder info
  */
-export function simulateAtBat(awayMatchups, homeMatchups, state, randomFn, describeFn) {
+export function simulateAtBat(awayMatchups, homeMatchups, state, awayFielders, homeFielders, randomFn, describeFn) {
   const _randomWeightedChoice = randomFn || randomWeightedChoice
   const _describeOutcome = describeFn || describeOutcome
   const teamIndex = state.top ? 0 : 1
   /** @type {import('./matchupPreparer.js').Matchup[]} */
   const lineup = teamIndex === 0 ? awayMatchups : homeMatchups
+  /** @type {Fielder[]} */
+  let fielders = teamIndex === 0 ? homeFielders : awayFielders // fielding team
+  // Defensive: ensure fielders is always an array
+  const safeFielders = Array.isArray(fielders) ? fielders : [];
   const batterIndex = state.lineupIndices[teamIndex]
   const matchup = lineup[batterIndex % lineup.length]
   const probabilities = /** @type {Record<string, number>} */ (matchup.probabilities)
@@ -93,6 +105,49 @@ export function simulateAtBat(awayMatchups, homeMatchups, state, randomFn, descr
   const descriptiveOutcome = _describeOutcome(outcome)
 
   state.lineupIndices[teamIndex]++
+
+  let fielder = undefined
+  let fielderPosition = ''
+  let errorOccurred = false
+
+  // If ball in play (not K, BB, HBP, HR), try to extract fielder position from description
+  if (outcome === 'Out') {
+    // e.g., "Groundout to SS"
+    const match = descriptiveOutcome.match(/to ([A-Z0-9]+)/)
+    if (match) {
+      fielderPosition = match[1]
+      fielder = safeFielders.find(f => f.position === fielderPosition)
+      // Error probability logic
+      if (fielder && fielder.stats) {
+        const E = Number(fielder.stats['E']) || 0
+        const PO = Number(fielder.stats['PO']) || 0
+        const A = Number(fielder.stats['A']) || 0
+        const chances = PO + A + E
+        const errorProb = chances > 0 ? E / chances : 0.01 // fallback to 1% if no data
+        if (Math.random() < errorProb) {
+          errorOccurred = true
+        }
+      } else {
+        // No stats, fallback to 1% error chance
+        if (Math.random() < 0.01) {
+          errorOccurred = true
+        }
+      }
+    }
+  }
+
+  if (errorOccurred) {
+    // Treat as error: advance runners as on a single, do not increment outs
+    const [newBases, runs] = advanceRunners(state.bases, '1B')
+    state.bases = newBases
+    state.score[teamIndex] += runs
+    return {
+      batter_id: matchup.batter_id,
+      outcome: `Error on ${fielderPosition}`,
+      fielder,
+      fielderPosition
+    }
+  }
 
   if (outcome === 'Out' || outcome === 'K') {
     state.outs++
@@ -108,6 +163,7 @@ export function simulateAtBat(awayMatchups, homeMatchups, state, randomFn, descr
 
   return {
     batter_id: matchup.batter_id,
-    outcome: descriptiveOutcome
+    outcome: descriptiveOutcome,
+    ...(fielder ? { fielder, fielderPosition } : {})
   }
 }
