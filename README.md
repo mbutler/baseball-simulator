@@ -1,8 +1,11 @@
 # Baseball Simulator
 
-## How this Codebase Works
+### 📊 Data Attribution
 
-This project simulates baseball games using real or mock team stats from Baseball Reference. The codebase is modular and type-safe (via JSDoc), and is fully covered by robust tests.
+This project uses data from [Baseball Reference](https://www.baseball-reference.com/). All data remains the property of Sports Reference LLC. This project is non-commercial and uses the data under fair use for educational and simulation purposes. Please visit their site for the most up-to-date and official statistics.
+
+*This project is not affiliated with or endorsed by Baseball Reference or Sports Reference LLC.*
+
 
 ### Main Flow
 1. **Parsing**: Raw HTML from Baseball Reference team pages is parsed to extract batting and pitching tables (`parseTables.js`, `statParser.js`).

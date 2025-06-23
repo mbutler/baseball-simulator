@@ -55,14 +55,40 @@ let editingTeam = null;
 
 // --- Utility: Hardcoded list of available teams ---
 async function fetchAvailableTeams() {
-  // Add or update this list as needed
   return [
+    "ARI-2025.html",
+    "ATL-2025.html",
+    "BAL-2025.html",
+    "BOS-2025.html",
     "CHC-2025.html",
+    "CHW-2025.html",
+    "CIN-2025.html",
+    "CLE-2025.html",
+    "COL-2025.html",
+    "DET-2025.html",
+    "HOU-2025.html",
+    "KCR-2025.html",
+    "LAA-2025.html",
+    "LAD-2025.html",
+    "MIA-2025.html",
     "MIL-2025.html",
+    "MIN-2025.html",
+    "NYM-2025.html",
+    "NYY-2025.html",
+    "OAK-2025.html",
+    "PHI-2025.html",
     "PIT-2025.html",
-    "SEA-2025.html"
-  ];
+    "SDP-2025.html",
+    "SEA-2025.html",
+    "SFG-2025.html",
+    "STL-2025.html",
+    "TBR-2025.html",
+    "TEX-2025.html",
+    "TOR-2025.html",
+    "WSN-2025.html"
+  ]
 }
+
 
 /**
  * @param {string} filename
