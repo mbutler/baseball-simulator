@@ -59,6 +59,10 @@ let customAwayPitcher = null;
 /** @type {'home' | 'away' | null} */
 let editingTeam = null;
 
+// --- Persistent At-Bat Log ---
+/** @type {Array<{ batterName: string, outcome: string, outs: number, score: number[], bases: number[], inning: number, top: boolean }>} */
+let atBatLog = [];
+
 // --- Utility: Hardcoded list of available teams ---
 async function fetchAvailableTeams() {
   return [
@@ -186,24 +190,34 @@ function renderGameState() {
 function renderAtBatResult(result, isNewHalfInning = false) {
   if (!atbatResultContainer) return;
   if (!result) return;
-  // Insert inning/half-inning label if needed
-  if (isNewHalfInning) {
-    const labelDiv = document.createElement('div');
-    labelDiv.style.marginTop = '1em';
-    labelDiv.style.fontWeight = 'bold';
-    labelDiv.textContent = `Inning ${result.inning} - ${result.top ? 'Top' : 'Bottom'}`;
-    atbatResultContainer.appendChild(labelDiv);
-  }
-  // Format base state
-  const basesStr = ['1B','2B','3B'].map((b,i) => result.bases[i] ? b : '').filter(Boolean).join(', ') || 'Empty';
-  // Append new result as a div
-  const div = document.createElement('div');
-  div.innerHTML = `<strong>Batter:</strong> ${result.batterName}<br><strong>Result:</strong> ${result.outcome}<br><strong>Outs:</strong> ${result.outs} &nbsp; <strong>Score:</strong> Away ${result.score[0]} – Home ${result.score[1]} &nbsp; <strong>Bases:</strong> ${basesStr}`;
-  atbatResultContainer.appendChild(div);
-  atbatResultContainer.appendChild(document.createElement('br'));
+  // Add to persistent log
+  atBatLog.push(result);
+  renderAllAtBatResults();
+}
 
-  // Scroll to latest entry
-  atbatResultContainer.scrollTop = atbatResultContainer.scrollHeight;
+function renderAllAtBatResults() {
+  if (!atbatResultContainer) return;
+  atbatResultContainer.innerHTML = '';
+  let lastInning = null;
+  let lastTop = null;
+  for (const result of atBatLog) {
+    // Insert inning/half-inning label if needed
+    if (result.inning !== lastInning || result.top !== lastTop) {
+      const labelDiv = document.createElement('div');
+      labelDiv.style.marginTop = '1em';
+      labelDiv.style.fontWeight = 'bold';
+      labelDiv.textContent = `Inning ${result.inning} - ${result.top ? 'Top' : 'Bottom'}`;
+      atbatResultContainer.appendChild(labelDiv);
+      lastInning = result.inning;
+      lastTop = result.top;
+    }
+    // Format base state
+    const basesStr = ['1B','2B','3B'].map((b,i) => result.bases[i] ? b : '').filter(Boolean).join(', ') || 'Empty';
+    // Append new result as a div
+    const div = document.createElement('div');
+    div.innerHTML = `<strong>${result.batterName}:</strong> ${result.outcome} <span style="color:#888">(Outs: ${result.outs}, Score: Away ${result.score[0]} – Home ${result.score[1]}, Bases: ${basesStr})</span>`;
+    atbatResultContainer.appendChild(div);
+  }
 }
 
 // --- Start a new game ---
@@ -212,6 +226,9 @@ function startGame() {
   homeMatchups = prepareMatchups(homeRoster);
   awayMatchups = prepareMatchups(awayRoster);
   gameState = initGameState();
+  // Reset persistent at-bat log
+  atBatLog = [];
+  renderAllAtBatResults();
   renderGameStateWithButtons();
 }
 
@@ -309,6 +326,9 @@ async function loadAndDisplayLineups() {
       : null;
     // Render the actual lineups that will be used in the game
     renderLineups(homeRoster, awayRoster);
+    // Reset persistent at-bat log
+    atBatLog = [];
+    renderAllAtBatResults();
     statusDiv.textContent = 'Lineups loaded. Ready to simulate!';
     startGame();
   } catch (err) {
@@ -404,17 +424,9 @@ if (customLineupForm) {
       customAwayPitcher = pitcher;
     }
     if (lineupModal) lineupModal.style.display = 'none';
-    // Reset game state and matchups so new lineup is used
-    homeMatchups = null;
-    awayMatchups = null;
-    gameState = null;
-    lastRenderedInning = 1;
-    lastRenderedTop = true;
-    if (atbatResultContainer) atbatResultContainer.innerHTML = '';
-    // Re-render lineups to reflect custom lineup (use homeRoster/awayRoster)
-    renderLineups(homeRoster, awayRoster);
-    // Re-render lineups and restart game with new custom lineup
-    loadAndDisplayLineups();
+    
+    // Update rosters without resetting game state
+    updateRostersWithNewLineups();
   });
 }
 
@@ -603,3 +615,38 @@ if (pickoff3bBtn) pickoff3bBtn.addEventListener('click', () => {
   });
   renderGameStateWithButtons();
 });
+
+/**
+ * Update rosters with new lineups without resetting game state
+ */
+function updateRostersWithNewLineups() {
+  if (!loadedHome || !loadedAway) return;
+  
+  // Rebuild rosters with current custom lineups
+  homeRoster = loadedHome && loadedHome.batters && loadedHome.pitchers
+    ? buildRoster(
+        customHomeLineup && customHomeLineup.length === 9 ? customHomeLineup : loadedHome.batters.slice(0,9).map(b=>b.player_id),
+        customHomePitcher || loadedHome.pitchers[0].player_id,
+        /** @type {any[]} */(loadedHome.batters),
+        /** @type {any[]} */(loadedHome.pitchers)
+      )
+    : null;
+  awayRoster = loadedAway && loadedAway.batters && loadedAway.pitchers
+    ? buildRoster(
+        customAwayLineup && customAwayLineup.length === 9 ? customAwayLineup : loadedAway.batters.slice(0,9).map(b=>b.player_id),
+        customAwayPitcher || loadedAway.pitchers[0].player_id,
+        /** @type {any[]} */(loadedAway.batters),
+        /** @type {any[]} */(loadedAway.pitchers)
+      )
+    : null;
+  
+  // Rebuild matchups for future at-bats
+  if (homeRoster && awayRoster) {
+    homeMatchups = prepareMatchups({ lineup: homeRoster.lineup, pitcher: awayRoster.pitcher });
+    awayMatchups = prepareMatchups({ lineup: awayRoster.lineup, pitcher: homeRoster.pitcher });
+  }
+  
+  // Update the display
+  renderLineups(homeRoster, awayRoster);
+  renderGameState();
+}
