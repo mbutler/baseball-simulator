@@ -45,6 +45,24 @@ export function initGameState() {
 }
 
 /**
+ * Returns an array of base indices (0=1B, 1=2B, 2=3B) for runners who are forced to advance.
+ * @param {number[]} bases - Array of 3 numbers, representing runners on 1B, 2B, 3B (0 or 1)
+ * @returns {number[]} Indices of forced runners
+ */
+function getForcedRunners(bases) {
+  // Forced if all bases behind are occupied (including batter becoming a runner)
+  // On a ground ball, batter always goes to 1B, so all runners are forced if all bases behind are occupied
+  const forced = [];
+  // If 1B is occupied, runner is forced
+  if (bases[0]) forced.push(0);
+  // If 2B is occupied and 1B is occupied, runner on 2B is forced
+  if (bases[1] && bases[0]) forced.push(1);
+  // If 3B is occupied and 2B and 1B are occupied, runner on 3B is forced
+  if (bases[2] && bases[1] && bases[0]) forced.push(2);
+  return forced;
+}
+
+/**
  * Advance runners and return number of runs scored.
  * Mutates gameState.bases.
  * @param {number[]} bases - Array of 3 numbers, representing runners on 1B, 2B, 3B (0 or 1)
@@ -169,54 +187,7 @@ export function simulateAtBat(awayMatchups, homeMatchups, state, awayFielders, h
     }
   }
 
-  // --- Triple Play Logic ---
-  // Only for groundouts, runners on 1st and 2nd (or bases loaded), 0 outs
-  if (
-    outcome === 'Out' &&
-    /^Groundout to [A-Z0-9]+$/.test(descriptiveOutcome) &&
-    state.outs === 0 &&
-    state.bases[0] === 1 &&
-    state.bases[1] === 1
-  ) {
-    // 1% chance for triple play
-    if (Math.random() < 0.01) {
-      triplePlayOccurred = true;
-      // Remove runners on first and second
-      state.bases[0] = 0;
-      state.bases[1] = 0;
-      // Remove batter (all 3 outs)
-      state.outs = 3;
-      return {
-        batter_id: matchup.batter_id,
-        outcome: 'Grounded into triple play',
-        ...(fielder ? { fielder, fielderPosition } : {})
-      };
-    }
-  }
-
-  // --- Double Play Logic ---
-  // Only for groundouts, runner on first, <2 outs
-  if (
-    outcome === 'Out' &&
-    /^Groundout to [A-Z0-9]+$/.test(descriptiveOutcome) &&
-    state.outs < 2 &&
-    state.bases[0] === 1
-  ) {
-    // 25% chance for double play
-    if (Math.random() < 0.25) {
-      doublePlayOccurred = true;
-      // Remove runner on first
-      state.bases[0] = 0;
-      // Increment outs by 2, but cap at 3
-      state.outs = Math.min(state.outs + 2, 3);
-      return {
-        batter_id: matchup.batter_id,
-        outcome: 'Grounded into double play',
-        ...(fielder ? { fielder, fielderPosition } : {})
-      };
-    }
-  }
-
+  // --- Error logic takes precedence over double/triple play logic ---
   if (errorOccurred) {
     // Treat as error: advance runners as on a single, do not increment outs
     const [newBases, runs] = advanceRunners(state.bases, '1B')
@@ -228,6 +199,90 @@ export function simulateAtBat(awayMatchups, homeMatchups, state, awayFielders, h
       fielder,
       fielderPosition
     }
+  }
+
+  // --- Triple Play Logic ---
+  // Only for groundouts, runners on 1st and 2nd (or bases loaded), 0 outs
+  if (
+    outcome === 'Out' &&
+    /^Groundout to [A-Z0-9]+$/.test(descriptiveOutcome) &&
+    state.outs === 0
+  ) {
+    const forced = getForcedRunners(state.bases);
+    if (forced.length >= 2) {
+      // 1% chance for triple play
+      if (Math.random() < 0.01) {
+        triplePlayOccurred = true;
+        // Remove batter and two lead forced runners
+        // Remove highest base forced runners first
+        const forcedSorted = forced.slice().sort((a, b) => b - a);
+        for (let i = 0; i < 2 && i < forcedSorted.length; i++) {
+          state.bases[forcedSorted[i]] = 0;
+        }
+        // Remove batter (all 3 outs)
+        state.outs = 3;
+        return {
+          batter_id: matchup.batter_id,
+          outcome: 'Grounded into triple play',
+          ...(fielder ? { fielder, fielderPosition } : {})
+        };
+      }
+    }
+  }
+
+  // --- Double Play Logic ---
+  // Only for groundouts, runner(s) forced, <2 outs
+  if (
+    outcome === 'Out' &&
+    /^Groundout to [A-Z0-9]+$/.test(descriptiveOutcome) &&
+    state.outs < 2
+  ) {
+    const forced = getForcedRunners(state.bases);
+    if (forced.length >= 1) {
+      // 25% chance for double play
+      if (Math.random() < 0.25) {
+        doublePlayOccurred = true;
+        // Remove batter and lead forced runner
+        // Remove highest base forced runner
+        const leadForced = Math.max(...forced);
+        state.bases[leadForced] = 0;
+        // Increment outs by 2, but cap at 3
+        state.outs = Math.min(state.outs + 2, 3);
+        return {
+          batter_id: matchup.batter_id,
+          outcome: 'Grounded into double play',
+          ...(fielder ? { fielder, fielderPosition } : {})
+        };
+      }
+    }
+  }
+
+  // --- Standard groundout logic: batter out at 1B, forced runners advance, unforced runners hold ---
+  if (outcome === 'Out' && /^Groundout to [A-Z0-9]+$/.test(descriptiveOutcome)) {
+    // Remove batter (out at 1B)
+    state.outs++;
+    // Advance forced runners from highest to lowest base
+    const forced = getForcedRunners(state.bases);
+    for (const idx of forced.slice().sort((a, b) => b - a)) {
+      if (state.bases[idx]) {
+        if (idx === 2) {
+          // Forced runner on 3B scores
+          state.bases[idx] = 0;
+          state.score[teamIndex] += 1;
+        } else {
+          // Move runner up one base
+          state.bases[idx + 1] = 1;
+          state.bases[idx] = 0;
+          console.log('Advancing forced runner from', idx, 'to', idx + 1, 'Bases:', state.bases);
+        }
+      }
+    }
+    // Unforced runners hold
+    return {
+      batter_id: matchup.batter_id,
+      outcome: descriptiveOutcome,
+      ...(fielder ? { fielder, fielderPosition } : {})
+    };
   }
 
   if (outcome === 'Out' || outcome === 'K') {
