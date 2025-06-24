@@ -434,6 +434,17 @@ function showLineupModal(team, batters, pitchers, currentLineup, currentPitcher)
   if (lineupError) lineupError.textContent = '';
   lineupModal.style.display = 'flex';
 
+  // Use the current roster's lineup/pitcher if available
+  let effectiveLineup = currentLineup;
+  let effectivePitcher = currentPitcher;
+  if (team === 'home' && homeRoster) {
+    effectiveLineup = homeRoster.lineup ? homeRoster.lineup.map(b => b.player_id) : currentLineup;
+    effectivePitcher = homeRoster.pitcher ? homeRoster.pitcher.player_id : currentPitcher;
+  } else if (team === 'away' && awayRoster) {
+    effectiveLineup = awayRoster.lineup ? awayRoster.lineup.map(b => b.player_id) : currentLineup;
+    effectivePitcher = awayRoster.pitcher ? awayRoster.pitcher.player_id : currentPitcher;
+  }
+
   // Batting order dropdowns
   battingOrderList.innerHTML = '';
   for (let i = 0; i < 9; i++) {
@@ -443,7 +454,7 @@ function showLineupModal(team, batters, pitchers, currentLineup, currentPitcher)
     select.required = true;
     select.innerHTML = '<option value="">-- Select --</option>' +
       batters.map(b => `<option value="${b.player_id}">${b.name} (${b.PA} PA)</option>`).join('');
-    if (currentLineup && currentLineup[i]) select.value = currentLineup[i];
+    if (effectiveLineup && effectiveLineup[i]) select.value = effectiveLineup[i];
     li.appendChild(select);
     battingOrderList.appendChild(li);
   }
@@ -451,7 +462,7 @@ function showLineupModal(team, batters, pitchers, currentLineup, currentPitcher)
   // Pitcher dropdown
   pitcherSelect.innerHTML = '<option value="">-- Select --</option>' +
     pitchers.map(p => `<option value="${p.player_id}">${p.name} (${p.stats && p.stats.IP ? p.stats.IP : ''} IP)</option>`).join('');
-  if (currentPitcher) /** @type {HTMLSelectElement} */(pitcherSelect).value = currentPitcher;
+  if (effectivePitcher) /** @type {HTMLSelectElement} */(pitcherSelect).value = effectivePitcher;
 }
 
 function updateBaseActionButtons() {
