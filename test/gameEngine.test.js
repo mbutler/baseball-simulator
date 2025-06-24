@@ -232,6 +232,61 @@ function runTests() {
   }
   console.log('✅ Pitcher fatigue test passed.');
 
+  // --- Test double play ---
+  resetState();
+  testState.bases = [1, 0, 0]; // runner on 1B
+  testState.outs = 0;
+  // Force groundout and double play (Math.random < 0.25)
+  let dpResult = simulateAtBat(
+    [{ batter_id: 'b1', probabilities: { Out: 1 } }],
+    [{ batter_id: 'h1', probabilities: { Out: 1 } }],
+    testState,
+    [],
+    [],
+    () => 'Out',
+    () => 'Groundout to SS'
+  );
+  // SimulateAtBat uses Math.random, so we need to mock it. Instead, check that double play logic is present.
+  // We'll simulate the double play logic directly:
+  // Manually trigger double play logic for test
+  testState.bases = [1, 0, 0];
+  testState.outs = 0;
+  Math.random = () => 0.1; // Force double play
+  dpResult = simulateAtBat(
+    [{ batter_id: 'b1', probabilities: { Out: 1 } }],
+    [{ batter_id: 'h1', probabilities: { Out: 1 } }],
+    testState,
+    [],
+    [],
+    () => 'Out',
+    () => 'Groundout to SS'
+  );
+  assertEqual(dpResult.outcome, 'Grounded into double play', 'Double play outcome');
+  assertEqual(testState.outs, 2, 'Double play outs');
+  assertEqual(testState.bases[0], 0, 'Runner on 1B removed in double play');
+
+  // --- Test triple play ---
+  resetState();
+  testState.bases = [1, 1, 0]; // runners on 1B and 2B
+  testState.outs = 0;
+  Math.random = () => 0.001; // Force triple play
+  let tpResult = simulateAtBat(
+    [{ batter_id: 'b1', probabilities: { Out: 1 } }],
+    [{ batter_id: 'h1', probabilities: { Out: 1 } }],
+    testState,
+    [],
+    [],
+    () => 'Out',
+    () => 'Groundout to SS'
+  );
+  assertEqual(tpResult.outcome, 'Grounded into triple play', 'Triple play outcome');
+  assertEqual(testState.outs, 3, 'Triple play outs');
+  assertEqual(testState.bases[0], 0, 'Runner on 1B removed in triple play');
+  assertEqual(testState.bases[1], 0, 'Runner on 2B removed in triple play');
+  // Restore Math.random
+  Math.random = (function() { return Math.random; })();
+  console.log('✅ Double and triple play tests passed.');
+
   console.log('✅ All gameEngine tests passed.')
 }
 
