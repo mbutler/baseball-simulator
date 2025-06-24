@@ -201,6 +201,9 @@ function renderAtBatResult(result, isNewHalfInning = false) {
   div.innerHTML = `<strong>Batter:</strong> ${result.batterName}<br><strong>Result:</strong> ${result.outcome}<br><strong>Outs:</strong> ${result.outs} &nbsp; <strong>Score:</strong> Away ${result.score[0]} – Home ${result.score[1]} &nbsp; <strong>Bases:</strong> ${basesStr}`;
   atbatResultContainer.appendChild(div);
   atbatResultContainer.appendChild(document.createElement('br'));
+
+  // Scroll to latest entry
+  atbatResultContainer.scrollTop = atbatResultContainer.scrollHeight;
 }
 
 // --- Start a new game ---

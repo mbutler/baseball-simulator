@@ -1,135 +1,319 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Baseball Simulator</title>
   <style>
-    body {
-      font-family: system-ui, sans-serif;
-      background: #f8f9fa;
-      margin: 0;
-      padding: 0;
+    :root {
+      --primary-color: #0066cc;
+      --accent-color: #e0f0ff;
+      --success-color: #28a745;
+      --danger-color: #dc3545;
+      --border-radius: 12px;
     }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background-color: #f2f4f7;
+      color: #333;
+    }
+
     #simulator-app {
       max-width: 700px;
-      margin: 2em auto;
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px #0001;
-      padding: 2em;
+      margin: 1.5em auto 5em;
+      padding: 1em;
     }
+
     h1 {
-      margin-top: 0;
-      font-size: 2em;
       text-align: center;
+      font-size: 1.8em;
+      margin-bottom: 1em;
     }
-    label {
-      margin-right: 0.5em;
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75em;
+      justify-content: center;
+      background: white;
+      padding: 1em;
+      border-radius: var(--border-radius);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
     }
-    select, button {
-      margin-right: 1em;
+
+    .controls label {
+      font-weight: 500;
+    }
+
+    .controls select,
+    .controls button {
       font-size: 1em;
-      padding: 0.2em 0.5em;
+      padding: 0.5em 0.75em;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      background: white;
+      flex: 1 1 auto;
     }
+
+    .controls button {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    .controls button:hover {
+      background: #0052a3;
+    }
+
     #status {
       margin-top: 1em;
+      text-align: center;
+      font-size: 0.95em;
       color: #555;
-      min-height: 1.5em;
+      min-height: 1.2em;
     }
+
     .section {
       margin-top: 2em;
+      background: white;
+      border-radius: var(--border-radius);
+      padding: 1em;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
     }
+
+    h2 {
+      font-size: 1.2em;
+      margin-bottom: 0.75em;
+    }
+
     .lineup-table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 0.5em;
     }
-    .lineup-table th, .lineup-table td {
+
+    .lineup-table th,
+    .lineup-table td {
       border: 1px solid #ddd;
-      padding: 0.3em 0.6em;
+      padding: 0.5em;
       text-align: left;
+      font-size: 0.95em;
     }
+
     .game-state {
-      margin-top: 1.5em;
-      font-size: 1.1em;
-      background: #f3f6fa;
+      background: var(--accent-color);
       padding: 1em;
-      border-radius: 6px;
+      border-radius: 8px;
+      font-size: 1em;
+      line-height: 1.4;
     }
-    #next-atbat-btn {
+
+    #atbat-result-container {
+      max-height: 300px;
+      overflow-y: auto;
+      padding-right: 0.5em;
+    }
+
+    .sticky-action-bar {
+      position: sticky;
+      bottom: 0;
+      background: white;
+      padding: 1em;
+      border-top: 1px solid #ddd;
+      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+      z-index: 50;
+    }
+
+    .sticky-action-bar .base-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5em;
+      justify-content: center;
+      margin-bottom: 0.75em;
+    }
+
+    .sticky-action-bar button {
+      flex: 1 1 45%;
+      padding: 0.5em;
+      font-size: 1em;
+      border: none;
+      border-radius: 6px;
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      cursor: pointer;
+    }
+
+    .sticky-action-bar button:hover {
+      background: #e2e2e2;
+    }
+
+    .sticky-action-bar #next-atbat-btn {
+      width: 100%;
+      background: var(--success-color);
+      color: white;
+      font-weight: bold;
+    }
+
+    .sticky-action-bar #next-atbat-btn:hover {
+      background: #218838;
+    }
+    
+
+    #custom-lineup-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 1em;
+    }
+
+
+    #custom-lineup-modal .modal-content {
+      background: white;
+      padding: 1.5em;
+      border-radius: var(--border-radius);
+      width: 100%;
+      max-width: 480px;
+      position: relative;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    #close-lineup-modal {
+      position: absolute;
+      top: 0.5em;
+      right: 0.75em;
+      background: none;
+      border: none;
+      font-size: 1.5em;
+      cursor: pointer;
+    }
+
+    #batting-order-list {
+      padding-left: 1.2em;
+    }
+
+    #pitcher-select {
+      width: 100%;
+      margin-top: 0.5em;
+      padding: 0.5em;
+      font-size: 1em;
+    }
+
+    #save-lineup-btn {
+      margin-top: 1.5em;
+      padding: 0.6em 1.2em;
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1em;
+      width: 100%;
+    }
+
+    #lineup-error {
+      color: var(--danger-color);
       margin-top: 1em;
-      font-size: 1.1em;
-      padding: 0.5em 1.2em;
+    }
+
+    @media (max-width: 600px) {
+      .controls {
+        flex-direction: column;
+      }
+
+      .controls select,
+      .controls button,
+      .base-actions button {
+        width: 100%;
+      }
+
+      .lineup-table th,
+      .lineup-table td {
+        font-size: 0.9em;
+      }
+
+      .base-actions {
+        gap: 0.75em;
+      }
     }
   </style>
 </head>
 <body>
   <div id="simulator-app">
     <h1>Baseball Simulator</h1>
-    <div>
-      <label for="home-team-select">Home Team:</label>
+
+    <div class="controls">
+      <label for="home-team-select">Home</label>
       <select id="home-team-select"></select>
-      <label for="away-team-select">Away Team:</label>
+
+      <label for="away-team-select">Away</label>
       <select id="away-team-select"></select>
+
       <button id="load-teams-btn">Reload Teams</button>
       <button id="customize-home-lineup-btn">Customize Home Lineup</button>
       <button id="customize-away-lineup-btn">Customize Away Lineup</button>
     </div>
+
     <div id="status"></div>
 
     <div class="section" id="lineups-section">
       <h2>Lineups</h2>
-      <div id="lineups-container">
-        <!-- Lineups for both teams will be rendered here -->
-      </div>
+      <div id="lineups-container"></div>
     </div>
 
     <div class="section" id="game-section">
       <h2>Game State</h2>
-      <div class="game-state" id="game-state-container">
-        <!-- Game state (inning, outs, bases, score, etc.) will be rendered here -->
-      </div>
-      <div id="base-action-controls" style="margin:1em 0;">
-        <button id="steal-2b-btn">Steal 2B</button>
-        <button id="steal-3b-btn">Steal 3B</button>
-        <button id="steal-home-btn">Steal Home</button>
-        <button id="pickoff-1b-btn">Pickoff 1B</button>
-        <button id="pickoff-2b-btn">Pickoff 2B</button>
-        <button id="pickoff-3b-btn">Pickoff 3B</button>
-      </div>
-      <button id="next-atbat-btn" style="display:none;">Next At-Bat</button>
+      <div class="game-state" id="game-state-container"></div>
     </div>
 
     <div class="section" id="atbat-section">
       <h2>At-Bat Result</h2>
-      <div id="atbat-result-container">
-        <!-- At-bat outcome and details will be rendered here -->
-      </div>
-    </div>
-
-    <!-- Modal for lineup customization -->
-    <div id="custom-lineup-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#0008; z-index:1000; align-items:center; justify-content:center;">
-      <div style="background:#fff; padding:2em; border-radius:8px; max-width:500px; margin:auto; position:relative;">
-        <button id="close-lineup-modal" style="position:absolute; top:0.5em; right:0.5em;">&times;</button>
-        <h2 id="lineup-modal-title">Customize Lineup</h2>
-        <form id="custom-lineup-form">
-          <div>
-            <h3>Batting Order</h3>
-            <ol id="batting-order-list"></ol>
-          </div>
-          <div style="margin-top:1em;">
-            <h3>Starting Pitcher</h3>
-            <select id="pitcher-select"></select>
-          </div>
-          <div style="margin-top:1.5em;">
-            <button type="submit" id="save-lineup-btn">Use This Lineup</button>
-          </div>
-        </form>
-        <div id="lineup-error" style="color:red; margin-top:1em;"></div>
-      </div>
+      <div id="atbat-result-container"></div>
     </div>
   </div>
+
+  <!-- Sticky Controls -->
+  <div class="sticky-action-bar">
+    <div class="base-actions">
+      <button id="steal-2b-btn">Steal 2B</button>
+      <button id="steal-3b-btn">Steal 3B</button>
+      <button id="steal-home-btn">Steal Home</button>
+      <button id="pickoff-1b-btn">Pickoff 1B</button>
+      <button id="pickoff-2b-btn">Pickoff 2B</button>
+      <button id="pickoff-3b-btn">Pickoff 3B</button>
+    </div>
+    <button id="next-atbat-btn" style="display:none;">Next At-Bat</button>
+  </div>
+
+  <!-- Modal -->
+  <div id="custom-lineup-modal">
+    <div class="modal-content">
+      <button id="close-lineup-modal">&times;</button>
+      <h2 id="lineup-modal-title">Customize Lineup</h2>
+      <form id="custom-lineup-form">
+        <div>
+          <h3>Batting Order</h3>
+          <ol id="batting-order-list"></ol>
+        </div>
+        <div>
+          <h3>Starting Pitcher</h3>
+          <select id="pitcher-select"></select>
+        </div>
+        <button type="submit" id="save-lineup-btn">Use This Lineup</button>
+      </form>
+      <div id="lineup-error"></div>
+    </div>
+  </div>
+
   <script type="module" src="js/bundle.js"></script>
 </body>
 </html>
