@@ -14,6 +14,7 @@ import { describeOutcome } from '../utils/describeOutcome.js'
  * @property {number[]} bases - Array of 3 numbers, representing runners on 1B, 2B, 3B (0 or 1)
  * @property {number[]} lineupIndices - Current batter index for each team ([away, home])
  * @property {number[]} score - Current score ([away, home])
+ * @property {{ battersFaced: number }[]} pitcherFatigue - Array tracking batters faced for each pitcher ([away, home])
  */
 
 /**
@@ -38,7 +39,8 @@ export function initGameState() {
     outs: 0,
     bases: [0, 0, 0],
     lineupIndices: [0, 0], // [away, home]
-    score: [0, 0]          // [away, home]
+    score: [0, 0],         // [away, home]
+    pitcherFatigue: [ { battersFaced: 0 }, { battersFaced: 0 } ] // [away, home]
   }
 }
 
@@ -105,7 +107,31 @@ export function simulateAtBat(awayMatchups, homeMatchups, state, awayFielders, h
   const safeFielders = Array.isArray(fielders) ? fielders : [];
   const batterIndex = state.lineupIndices[teamIndex]
   const matchup = lineup[batterIndex % lineup.length]
-  const probabilities = /** @type {Record<string, number>} */ (matchup.probabilities)
+  let probabilities = /** @type {Record<string, number>} */ (matchup.probabilities)
+
+  // --- Pitcher Fatigue Logic ---
+  if (state.pitcherFatigue && state.pitcherFatigue[1 - teamIndex]) {
+    // Increment batters faced for the pitching team
+    state.pitcherFatigue[1 - teamIndex].battersFaced++;
+    const fatigue = state.pitcherFatigue[1 - teamIndex].battersFaced;
+    if (fatigue > 18) { // After 2 times through the order
+      // Adjust probabilities: increase BB/H, decrease K/Out
+      const factor = Math.min((fatigue - 18) * 0.02, 0.2); // up to 20% adjustment
+      probabilities = { ...probabilities };
+      if (probabilities['BB']) probabilities['BB'] += factor;
+      if (probabilities['HBP']) probabilities['HBP'] += factor / 2;
+      if (probabilities['1B']) probabilities['1B'] += factor;
+      if (probabilities['2B']) probabilities['2B'] += factor / 2;
+      if (probabilities['3B']) probabilities['3B'] += factor / 4;
+      if (probabilities['HR']) probabilities['HR'] += factor / 4;
+      if (probabilities['K']) probabilities['K'] -= factor;
+      if (probabilities['Out']) probabilities['Out'] -= factor;
+      // Normalize so total = 1
+      const total = Object.values(probabilities).reduce((a, b) => a + b, 0);
+      Object.keys(probabilities).forEach(k => probabilities[k] = Math.max(0, probabilities[k] / total));
+    }
+  }
+
   const outcome = _randomWeightedChoice(probabilities)
   const descriptiveOutcome = _describeOutcome(outcome)
 

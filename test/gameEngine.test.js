@@ -205,6 +205,33 @@ function runTests() {
   pickoffResult = attemptPickoff(1, testState, makePlayer(), makePlayer(), makePlayer(), always(0.01))
   assertEqual(pickoffResult.success, false, 'No runner to pick off')
 
+  // --- Test pitcher fatigue ---
+  resetState();
+  // Setup: always return 'Out' unless fatigue adjustment is applied
+  const alwaysOut = () => 'Out';
+  const alwaysDescribe = () => 'Out';
+  // Use a matchup with only 'Out' and 'BB' for clarity
+  const fatigueMatchup = [{ batter_id: 'b1', probabilities: { Out: 0.9, BB: 0.1 } }];
+  // Simulate 20 at-bats
+  for (let i = 0; i < 20; i++) {
+    simulateAtBat(fatigueMatchup, fatigueMatchup, testState, [], [], alwaysOut, alwaysDescribe);
+  }
+  // After 20 at-bats, pitcherFatigue should be 20 for the pitching team
+  assertEqual(testState.pitcherFatigue[1].battersFaced, 20, 'Pitcher fatigue increments with batters faced');
+  // Now, simulate an at-bat and check that BB probability is higher due to fatigue
+  // We'll use a custom randomFn to check the probabilities used
+  let usedProbabilities = null;
+  const customRandomWeightedChoice = (probs) => {
+    usedProbabilities = { ...probs };
+    return 'BB';
+  };
+  simulateAtBat(fatigueMatchup, fatigueMatchup, testState, [], [], customRandomWeightedChoice, alwaysDescribe);
+  // BB probability should be higher than original 0.1
+  if (!(usedProbabilities && usedProbabilities.BB > 0.1)) {
+    throw new Error('Fatigue did not increase BB probability as expected');
+  }
+  console.log('✅ Pitcher fatigue test passed.');
+
   console.log('✅ All gameEngine tests passed.')
 }
 
