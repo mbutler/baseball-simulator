@@ -23,6 +23,11 @@ import { describeOutcome } from '../utils/describeOutcome.js'
  */
 
 /**
+ * @typedef {Object} PlayerWithStats
+ * @property {Object.<string, number>} [stats] - Optional stats object
+ */
+
+/**
  * Initialize game state for two teams.
  * @returns {GameState} Initial game state object
  */
@@ -188,5 +193,144 @@ export function simulateAtBat(awayMatchups, homeMatchups, state, awayFielders, h
     batter_id: matchup.batter_id,
     outcome: descriptiveOutcome,
     ...(fielder ? { fielder, fielderPosition } : {})
+  }
+}
+
+/**
+ * Attempt to steal a base.
+ * @param {number} base - The base to steal (2 for 2B, 3 for 3B, 4 for home)
+ * @param {GameState} state - The current game state (mutated in place)
+ * @param {PlayerWithStats} runner - The runner object (should have .stats if available)
+ * @param {PlayerWithStats} pitcher - The pitcher object (should have .stats if available)
+ * @param {PlayerWithStats} catcher - The catcher object (should have .stats if available)
+ * @param {number} fromBase - The base the runner is currently on (1 for 1B, 2 for 2B, 3 for 3B)
+ * @param {function(number): number} [randomFn] - Optional random function, should be called as rand(1) to get [0,1)
+ * @returns {{ success: boolean, out: boolean, description: string }}
+ */
+export function attemptSteal(base, state, runner, pitcher, catcher, fromBase, randomFn) {
+  const rand = randomFn || Math.random;
+  // Check runner is present on fromBase
+  if (!state.bases[fromBase - 1]) {
+    return {
+      success: false,
+      out: false,
+      description: `No runner on base ${fromBase} to steal from.`
+    };
+  }
+  // Default probabilities
+  let successProb = base === 2 ? 0.6 : base === 3 ? 0.3 : 0.1;
+
+  // Use stats if available
+  if (runner?.stats && catcher?.stats) {
+    // Example: runner SPD vs catcher ARM
+    const runnerSpeed = Number(runner.stats['SPD'] || runner.stats['SB'] || 50); // fallback
+    const catcherArm = Number(catcher.stats['ARM'] || catcher.stats['CS%'] || 50); // fallback
+    // Simple model: higher speed, higher chance; higher arm, lower chance
+    successProb = 0.5 + (runnerSpeed - catcherArm) / 200; // Range ~0.0-1.0
+    // Adjust for base
+    if (base === 3) successProb -= 0.2;
+    if (base === 4) successProb -= 0.4;
+    successProb = Math.max(0.05, Math.min(0.95, successProb));
+  }
+
+  const attempt = rand(1);
+  if (attempt < successProb) {
+    // Success: advance runner
+    state.bases[fromBase - 1] = 0;
+    if (base <= 3) {
+      state.bases[base - 1] = 1;
+    } else {
+      // Stealing home: runner scores
+      state.score[state.top ? 0 : 1] += 1;
+    }
+    return {
+      success: true,
+      out: false,
+      description: `Runner successfully stole base ${base === 4 ? 'Home' : base}`
+    };
+  } else {
+    // Caught stealing: runner out
+    state.bases[fromBase - 1] = 0;
+    state.outs++;
+    return {
+      success: false,
+      out: true,
+      description: `Runner caught stealing base ${base === 4 ? 'Home' : base}`
+    };
+  }
+}
+
+/**
+ * Attempt a pickoff at a base.
+ * @param {number} base - The base to pick off (1, 2, or 3)
+ * @param {GameState} state - The current game state (mutated in place)
+ * @param {PlayerWithStats} runner - The runner object (should have .stats if available)
+ * @param {PlayerWithStats} pitcher - The pitcher object (should have .stats if available)
+ * @param {PlayerWithStats} fielder - The fielder covering the base (should have .stats if available)
+ * @param {function(number): number} [randomFn] - Optional random function, should be called as rand(1) to get [0,1)
+ * @returns {{ success: boolean, out: boolean, error: boolean, description: string }}
+ */
+export function attemptPickoff(base, state, runner, pitcher, fielder, randomFn) {
+  const rand = randomFn || Math.random;
+  // Check runner is present on base
+  if (!state.bases[base - 1]) {
+    return {
+      success: false,
+      out: false,
+      error: false,
+      description: `No runner on base ${base} to pick off.`
+    };
+  }
+  // Default probabilities
+  let pickoffProb = 0.05; // 5% pickoff
+  let errorProb = 0.1;    // 10% error
+
+  // Use stats if available
+  if (pitcher?.stats && runner?.stats) {
+    const pitcherPick = Number(pitcher.stats['PK'] || 50);
+    const runnerLead = Number(runner.stats['SPD'] || 50);
+    pickoffProb = 0.03 + (pitcherPick - runnerLead) / 1000; // Range ~0-0.1
+    pickoffProb = Math.max(0.01, Math.min(0.15, pickoffProb));
+  }
+  if (fielder?.stats) {
+    const fielderError = Number(fielder.stats['E'] || 0);
+    errorProb = 0.05 + fielderError / 1000;
+    errorProb = Math.max(0.01, Math.min(0.2, errorProb));
+  }
+
+  const attempt = rand(1);
+  if (attempt < pickoffProb) {
+    // Pickoff success
+    state.bases[base - 1] = 0;
+    state.outs++;
+    return {
+      success: true,
+      out: true,
+      error: false,
+      description: `Runner picked off at base ${base}`
+    };
+  } else if (attempt < pickoffProb + errorProb) {
+    // Pickoff error: runner advances
+    state.bases[base - 1] = 0;
+    if (base < 3) {
+      state.bases[base] = 1;
+    } else {
+      // Runner scores
+      state.score[state.top ? 0 : 1] += 1;
+    }
+    return {
+      success: false,
+      out: false,
+      error: true,
+      description: `Pickoff error: runner advances from base ${base}`
+    };
+  } else {
+    // No pickoff
+    return {
+      success: false,
+      out: false,
+      error: false,
+      description: `Pickoff attempt at base ${base} unsuccessful`
+    };
   }
 }

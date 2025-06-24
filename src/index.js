@@ -4,7 +4,7 @@ import { parseStatTable } from './utils/statParser.js';
 import { normalizeBattingStats, normalizePitchingStats } from './utils/statNormalizer.js';
 import { buildRoster } from './core/rosterBuilder.js';
 import { prepareMatchups } from './core/matchupPreparer.js';
-import { initGameState, simulateAtBat } from './core/gameEngine.js';
+import { initGameState, simulateAtBat, attemptSteal, attemptPickoff } from './core/gameEngine.js';
 
 // --- DOM Elements ---
 const homeSelect = document.getElementById('home-team-select');
@@ -24,6 +24,12 @@ const customLineupForm = document.getElementById('custom-lineup-form');
 const battingOrderList = document.getElementById('batting-order-list');
 const pitcherSelect = document.getElementById('pitcher-select');
 const lineupError = document.getElementById('lineup-error');
+const steal2bBtn = document.getElementById('steal-2b-btn');
+const steal3bBtn = document.getElementById('steal-3b-btn');
+const stealHomeBtn = document.getElementById('steal-home-btn');
+const pickoff1bBtn = document.getElementById('pickoff-1b-btn');
+const pickoff2bBtn = document.getElementById('pickoff-2b-btn');
+const pickoff3bBtn = document.getElementById('pickoff-3b-btn');
 
 // --- Game State ---
 /** @type {{ batters: any[]; pitchers: any[] } | null} */
@@ -203,8 +209,7 @@ function startGame() {
   homeMatchups = prepareMatchups(homeRoster);
   awayMatchups = prepareMatchups(awayRoster);
   gameState = initGameState();
-  renderGameState();
-  renderAtBatResult(null);
+  renderGameStateWithButtons();
 }
 
 // --- Simulate next at-bat ---
@@ -265,7 +270,7 @@ function handleNextAtBat() {
       atbatResultContainer.appendChild(labelDiv);
     }
   }
-  renderGameState();
+  renderGameStateWithButtons();
 }
 
 // --- Load and display lineups when both teams are selected ---
@@ -448,3 +453,139 @@ function showLineupModal(team, batters, pitchers, currentLineup, currentPitcher)
     pitchers.map(p => `<option value="${p.player_id}">${p.name} (${p.stats && p.stats.IP ? p.stats.IP : ''} IP)</option>`).join('');
   if (currentPitcher) /** @type {HTMLSelectElement} */(pitcherSelect).value = currentPitcher;
 }
+
+function updateBaseActionButtons() {
+  if (!gameState) return;
+  // Steal buttons: enable if runner present on base
+  if (steal2bBtn) (steal2bBtn instanceof HTMLButtonElement ? steal2bBtn : /** @type {HTMLButtonElement} */(steal2bBtn)).disabled = !gameState.bases[0];
+  if (steal3bBtn) (steal3bBtn instanceof HTMLButtonElement ? steal3bBtn : /** @type {HTMLButtonElement} */(steal3bBtn)).disabled = !gameState.bases[1];
+  if (stealHomeBtn) (stealHomeBtn instanceof HTMLButtonElement ? stealHomeBtn : /** @type {HTMLButtonElement} */(stealHomeBtn)).disabled = !gameState.bases[2];
+  // Pickoff buttons: enable if runner present on base
+  if (pickoff1bBtn) (pickoff1bBtn instanceof HTMLButtonElement ? pickoff1bBtn : /** @type {HTMLButtonElement} */(pickoff1bBtn)).disabled = !gameState.bases[0];
+  if (pickoff2bBtn) (pickoff2bBtn instanceof HTMLButtonElement ? pickoff2bBtn : /** @type {HTMLButtonElement} */(pickoff2bBtn)).disabled = !gameState.bases[1];
+  if (pickoff3bBtn) (pickoff3bBtn instanceof HTMLButtonElement ? pickoff3bBtn : /** @type {HTMLButtonElement} */(pickoff3bBtn)).disabled = !gameState.bases[2];
+}
+
+function renderGameStateWithButtons() {
+  renderGameState();
+  updateBaseActionButtons();
+}
+
+// Steal event handlers
+if (steal2bBtn) steal2bBtn.addEventListener('click', () => {
+  if (!gameState || !homeRoster || !awayRoster) return;
+  // Assume away team is batting if top, home if bottom
+  const teamIndex = gameState.top ? 0 : 1;
+  const roster = teamIndex === 0 ? awayRoster : homeRoster;
+  // Find runner on 1B (first in lineup who is not at bat)
+  const runner = roster.lineup.find(b => true) || {};
+  const pitcher = (teamIndex === 0 ? homeRoster : awayRoster).pitcher;
+  const catcher = (teamIndex === 0 ? homeRoster : awayRoster).lineup[0] || {};
+  const result = attemptSteal(2, gameState, runner, pitcher, catcher, 1);
+  renderAtBatResult({
+    batterName: 'Runner',
+    outcome: result.description,
+    outs: gameState.outs,
+    score: [...gameState.score],
+    bases: [...gameState.bases],
+    inning: gameState.inning,
+    top: gameState.top
+  });
+  renderGameStateWithButtons();
+});
+if (steal3bBtn) steal3bBtn.addEventListener('click', () => {
+  if (!gameState || !homeRoster || !awayRoster) return;
+  const teamIndex = gameState.top ? 0 : 1;
+  const roster = teamIndex === 0 ? awayRoster : homeRoster;
+  const runner = roster.lineup.find(b => true) || {};
+  const pitcher = (teamIndex === 0 ? homeRoster : awayRoster).pitcher;
+  const catcher = (teamIndex === 0 ? homeRoster : awayRoster).lineup[0] || {};
+  const result = attemptSteal(3, gameState, runner, pitcher, catcher, 2);
+  renderAtBatResult({
+    batterName: 'Runner',
+    outcome: result.description,
+    outs: gameState.outs,
+    score: [...gameState.score],
+    bases: [...gameState.bases],
+    inning: gameState.inning,
+    top: gameState.top
+  });
+  renderGameStateWithButtons();
+});
+if (stealHomeBtn) stealHomeBtn.addEventListener('click', () => {
+  if (!gameState || !homeRoster || !awayRoster) return;
+  const teamIndex = gameState.top ? 0 : 1;
+  const roster = teamIndex === 0 ? awayRoster : homeRoster;
+  const runner = roster.lineup.find(b => true) || {};
+  const pitcher = (teamIndex === 0 ? homeRoster : awayRoster).pitcher;
+  const catcher = (teamIndex === 0 ? homeRoster : awayRoster).lineup[0] || {};
+  const result = attemptSteal(4, gameState, runner, pitcher, catcher, 3);
+  renderAtBatResult({
+    batterName: 'Runner',
+    outcome: result.description,
+    outs: gameState.outs,
+    score: [...gameState.score],
+    bases: [...gameState.bases],
+    inning: gameState.inning,
+    top: gameState.top
+  });
+  renderGameStateWithButtons();
+});
+// Pickoff event handlers
+if (pickoff1bBtn) pickoff1bBtn.addEventListener('click', () => {
+  if (!gameState || !homeRoster || !awayRoster) return;
+  const teamIndex = gameState.top ? 0 : 1;
+  const roster = teamIndex === 0 ? awayRoster : homeRoster;
+  const runner = roster.lineup.find(b => true) || {};
+  const pitcher = (teamIndex === 0 ? homeRoster : awayRoster).pitcher;
+  const fielder = (teamIndex === 0 ? homeRoster : awayRoster).lineup[0] || {};
+  const result = attemptPickoff(1, gameState, runner, pitcher, fielder);
+  renderAtBatResult({
+    batterName: 'Runner',
+    outcome: result.description,
+    outs: gameState.outs,
+    score: [...gameState.score],
+    bases: [...gameState.bases],
+    inning: gameState.inning,
+    top: gameState.top
+  });
+  renderGameStateWithButtons();
+});
+if (pickoff2bBtn) pickoff2bBtn.addEventListener('click', () => {
+  if (!gameState || !homeRoster || !awayRoster) return;
+  const teamIndex = gameState.top ? 0 : 1;
+  const roster = teamIndex === 0 ? awayRoster : homeRoster;
+  const runner = roster.lineup.find(b => true) || {};
+  const pitcher = (teamIndex === 0 ? homeRoster : awayRoster).pitcher;
+  const fielder = (teamIndex === 0 ? homeRoster : awayRoster).lineup[0] || {};
+  const result = attemptPickoff(2, gameState, runner, pitcher, fielder);
+  renderAtBatResult({
+    batterName: 'Runner',
+    outcome: result.description,
+    outs: gameState.outs,
+    score: [...gameState.score],
+    bases: [...gameState.bases],
+    inning: gameState.inning,
+    top: gameState.top
+  });
+  renderGameStateWithButtons();
+});
+if (pickoff3bBtn) pickoff3bBtn.addEventListener('click', () => {
+  if (!gameState || !homeRoster || !awayRoster) return;
+  const teamIndex = gameState.top ? 0 : 1;
+  const roster = teamIndex === 0 ? awayRoster : homeRoster;
+  const runner = roster.lineup.find(b => true) || {};
+  const pitcher = (teamIndex === 0 ? homeRoster : awayRoster).pitcher;
+  const fielder = (teamIndex === 0 ? homeRoster : awayRoster).lineup[0] || {};
+  const result = attemptPickoff(3, gameState, runner, pitcher, fielder);
+  renderAtBatResult({
+    batterName: 'Runner',
+    outcome: result.description,
+    outs: gameState.outs,
+    score: [...gameState.score],
+    bases: [...gameState.bases],
+    inning: gameState.inning,
+    top: gameState.top
+  });
+  renderGameStateWithButtons();
+});

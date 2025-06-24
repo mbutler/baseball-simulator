@@ -1,4 +1,4 @@
-import { initGameState, simulateAtBat } from '../src/core/gameEngine.js'
+import { initGameState, simulateAtBat, attemptSteal, attemptPickoff } from '../src/core/gameEngine.js'
 
 function assertEqual(actual, expected, msg) {
   if (actual !== expected) throw new Error(msg + ` (expected ${expected}, got ${actual})`)
@@ -141,6 +141,69 @@ function runTests() {
     () => 'Out'
   )
   assertEqual(testState.lineupIndices[0], 10, 'lineup index increments to 10 (wraps with modulo in code)')
+
+  // --- Tests for attemptSteal and attemptPickoff ---
+  function makePlayer(stats = {}) {
+    return { stats }
+  }
+
+  function always(val) {
+    return () => val
+  }
+
+  // Steal: success (force random < prob)
+  resetState()
+  testState.bases = [1, 0, 0] // runner on 1B
+  let stealResult = attemptSteal(2, testState, makePlayer({ SPD: 80 }), makePlayer(), makePlayer({ ARM: 40 }), 1, always(0.1))
+  assertEqual(stealResult.success, true, 'Steal 2B success')
+  assertEqual(testState.bases[0], 0, '1B empty after steal')
+  assertEqual(testState.bases[1], 1, '2B occupied after steal')
+
+  // Steal: failure (force random > prob)
+  resetState()
+  testState.bases = [1, 0, 0]
+  stealResult = attemptSteal(2, testState, makePlayer({ SPD: 40 }), makePlayer(), makePlayer({ ARM: 80 }), 1, always(0.99))
+  assertEqual(stealResult.success, false, 'Steal 2B fail')
+  assertEqual(testState.bases[0], 0, '1B empty after caught stealing')
+  assertEqual(testState.bases[1], 0, '2B empty after caught stealing')
+  assertEqual(testState.outs, 1, 'Out incremented on caught stealing')
+
+  // Steal: no runner on base
+  resetState()
+  testState.bases = [0, 0, 0]
+  stealResult = attemptSteal(2, testState, makePlayer(), makePlayer(), makePlayer(), 1, always(0.1))
+  assertEqual(stealResult.success, false, 'No runner to steal')
+
+  // Steal: stealing home
+  resetState()
+  testState.bases = [0, 0, 1]
+  let beforeScoreStealHome = testState.score[0]
+  stealResult = attemptSteal(4, testState, makePlayer({ SPD: 80 }), makePlayer(), makePlayer({ ARM: 40 }), 3, always(0.1))
+  assertEqual(stealResult.success, true, 'Steal home success')
+  assertEqual(testState.bases[2], 0, '3B empty after steal home')
+  assertEqual(testState.score[0], beforeScoreStealHome + 1, 'Score incremented on steal home')
+
+  // Pickoff: success
+  resetState()
+  testState.bases = [1, 0, 0]
+  let pickoffResult = attemptPickoff(1, testState, makePlayer({ SPD: 40 }), makePlayer({ PK: 90 }), makePlayer({ E: 0 }), always(0.01))
+  assertEqual(pickoffResult.success, true, 'Pickoff success')
+  assertEqual(testState.bases[0], 0, '1B empty after pickoff')
+  assertEqual(testState.outs, 1, 'Out incremented on pickoff')
+
+  // Pickoff: error (runner advances)
+  resetState()
+  testState.bases = [0, 1, 0]
+  pickoffResult = attemptPickoff(2, testState, makePlayer({ SPD: 60 }), makePlayer({ PK: 50 }), makePlayer({ E: 100 }), always(0.11))
+  assertEqual(pickoffResult.error, true, 'Pickoff error')
+  assertEqual(testState.bases[1], 0, '2B empty after error')
+  assertEqual(testState.bases[2], 1, '3B occupied after error')
+
+  // Pickoff: no runner on base
+  resetState()
+  testState.bases = [0, 0, 0]
+  pickoffResult = attemptPickoff(1, testState, makePlayer(), makePlayer(), makePlayer(), always(0.01))
+  assertEqual(pickoffResult.success, false, 'No runner to pick off')
 
   console.log('✅ All gameEngine tests passed.')
 }
