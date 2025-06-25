@@ -38,5 +38,4 @@ async function main(args) {
   }
 }
 
-// @ts-expect-error Bun is provided by the Bun runtime
 main(Bun.argv.slice(2))

@@ -85,7 +85,7 @@ function runTests(): void {
       assertEqual(testState.bases[0], 0, `bases empty after HR`)
       assertEqual(testState.bases[1], 0, `bases empty after HR`)
       assertEqual(testState.bases[2], 0, `bases empty after HR`)
-      assertEqual(testState.score[0], before.score[0] + before.bases.reduce((a, b) => a + b, 0) + 1, `score increment for HR`)
+      assertEqual(testState.score[0], before.score[0] + before.bases.reduce((a: number, b: number) => a + b, 0) + 1, `score increment for HR`)
     } else if (['1B', '2B', '3B'].includes(outcome)) {
       // Should advance runners accordingly
       // For simplicity, just check batter on correct base
