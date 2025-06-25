@@ -191,15 +191,7 @@ function handleNextAtBat(): void {
     isNewHalfInning = true
   }
 
-  // After transitioning, check again in case the inning ended with a lead
   if (isNewHalfInning) {
-    checkGameEnd({
-      inning: state.inning,
-      top: state.top,
-      score: state.score as [number, number],
-      outs: 0 // start of new half-inning
-    }, endGame)
-
     if (atbatResultContainer) {
       const div = document.createElement('div')
       div.innerHTML = `<em>${transitionMsg}</em>`
