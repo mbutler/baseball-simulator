@@ -1,0 +1,26 @@
+// DOM element queries for the Baseball Simulator UI
+
+export const homeSelect = document.getElementById('home-team-select') as HTMLSelectElement | null;
+export const awaySelect = document.getElementById('away-team-select') as HTMLSelectElement | null;
+export const loadTeamsBtn = document.getElementById('load-teams-btn') as HTMLButtonElement | null;
+export const statusDiv = document.getElementById('status') as HTMLDivElement | null;
+export const lineupsContainer = document.getElementById('lineups-container') as HTMLDivElement | null;
+export const gameStateContainer = document.getElementById('game-state-container') as HTMLDivElement | null;
+export const nextAtBatBtn = document.getElementById('next-atbat-btn') as HTMLButtonElement | null;
+export const atbatResultContainer = document.getElementById('atbat-result-container') as HTMLDivElement | null;
+export const customizeHomeBtn = document.getElementById('customize-home-lineup-btn') as HTMLButtonElement | null;
+export const customizeAwayBtn = document.getElementById('customize-away-lineup-btn') as HTMLButtonElement | null;
+export const lineupModal = document.getElementById('custom-lineup-modal') as HTMLDivElement | null;
+export const closeLineupModalBtn = document.getElementById('close-lineup-modal') as HTMLButtonElement | null;
+export const lineupModalTitle = document.getElementById('lineup-modal-title') as HTMLHeadingElement | null;
+export const customLineupForm = document.getElementById('custom-lineup-form') as HTMLFormElement | null;
+export const battingOrderList = document.getElementById('batting-order-list') as HTMLUListElement | null;
+export const pitcherSelect = document.getElementById('pitcher-select') as HTMLSelectElement | null;
+export const lineupError = document.getElementById('lineup-error') as HTMLDivElement | null;
+export const steal2bBtn = document.getElementById('steal-2b-btn') as HTMLButtonElement | null;
+export const steal3bBtn = document.getElementById('steal-3b-btn') as HTMLButtonElement | null;
+export const stealHomeBtn = document.getElementById('steal-home-btn') as HTMLButtonElement | null;
+export const pickoff1bBtn = document.getElementById('pickoff-1b-btn') as HTMLButtonElement | null;
+export const pickoff2bBtn = document.getElementById('pickoff-2b-btn') as HTMLButtonElement | null;
+export const pickoff3bBtn = document.getElementById('pickoff-3b-btn') as HTMLButtonElement | null;
+export const simulateFullGameBtn = document.getElementById('simulate-full-game-btn') as HTMLButtonElement | null; 

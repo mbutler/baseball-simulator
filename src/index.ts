@@ -6,65 +6,45 @@ import { buildRoster } from './core/rosterBuilder.js';
 import { prepareMatchups, type Roster } from './core/matchupPreparer.js';
 import { initGameState, simulateAtBat, attemptSteal, attemptPickoff, type GameState } from './core/gameEngine.js';
 import { checkGameEnd } from './core/gameEndLogic.js';
-
-// --- DOM Elements ---
-const homeSelect = document.getElementById('home-team-select') as HTMLSelectElement | null;
-const awaySelect = document.getElementById('away-team-select') as HTMLSelectElement | null;
-const loadTeamsBtn = document.getElementById('load-teams-btn') as HTMLButtonElement | null;
-const statusDiv = document.getElementById('status') as HTMLDivElement | null;
-const lineupsContainer = document.getElementById('lineups-container') as HTMLDivElement | null;
-const gameStateContainer = document.getElementById('game-state-container') as HTMLDivElement | null;
-const nextAtBatBtn = document.getElementById('next-atbat-btn') as HTMLButtonElement | null;
-const atbatResultContainer = document.getElementById('atbat-result-container') as HTMLDivElement | null;
-const customizeHomeBtn = document.getElementById('customize-home-lineup-btn') as HTMLButtonElement | null;
-const customizeAwayBtn = document.getElementById('customize-away-lineup-btn') as HTMLButtonElement | null;
-const lineupModal = document.getElementById('custom-lineup-modal') as HTMLDivElement | null;
-const closeLineupModalBtn = document.getElementById('close-lineup-modal') as HTMLButtonElement | null;
-const lineupModalTitle = document.getElementById('lineup-modal-title') as HTMLHeadingElement | null;
-const customLineupForm = document.getElementById('custom-lineup-form') as HTMLFormElement | null;
-const battingOrderList = document.getElementById('batting-order-list') as HTMLUListElement | null;
-const pitcherSelect = document.getElementById('pitcher-select') as HTMLSelectElement | null;
-const lineupError = document.getElementById('lineup-error') as HTMLDivElement | null;
-const steal2bBtn = document.getElementById('steal-2b-btn') as HTMLButtonElement | null;
-const steal3bBtn = document.getElementById('steal-3b-btn') as HTMLButtonElement | null;
-const stealHomeBtn = document.getElementById('steal-home-btn') as HTMLButtonElement | null;
-const pickoff1bBtn = document.getElementById('pickoff-1b-btn') as HTMLButtonElement | null;
-const pickoff2bBtn = document.getElementById('pickoff-2b-btn') as HTMLButtonElement | null;
-const pickoff3bBtn = document.getElementById('pickoff-3b-btn') as HTMLButtonElement | null;
-
-// --- Game State ---
-interface LoadedTeam {
-  batters: NormalizedBatter[];
-  pitchers: NormalizedPitcher[];
-}
-
-let loadedHome: LoadedTeam | null = null;
-let loadedAway: LoadedTeam | null = null;
-let homeRoster: Roster | null = null;
-let awayRoster: Roster | null = null;
-let homeMatchups: any[] | null = null;
-let awayMatchups: any[] | null = null;
-let gameState: GameState | null = null;
-let lastRenderedInning = 1;
-let lastRenderedTop = true;
-let customHomeLineup: string[] | null = null;
-let customHomePitcher: string | null = null;
-let customAwayLineup: string[] | null = null;
-let customAwayPitcher: string | null = null;
-let editingTeam: 'home' | 'away' | null = null;
-
-// --- Persistent At-Bat Log ---
-interface AtBatLogEntry {
-  batterName: string;
-  outcome: string;
-  outs: number;
-  score: number[];
-  bases: number[];
-  inning: number;
-  top: boolean;
-}
-
-let atBatLog: AtBatLogEntry[] = [];
+import {
+  homeSelect,
+  awaySelect,
+  loadTeamsBtn,
+  statusDiv,
+  lineupsContainer,
+  gameStateContainer,
+  nextAtBatBtn,
+  atbatResultContainer,
+  customizeHomeBtn,
+  customizeAwayBtn,
+  lineupModal,
+  closeLineupModalBtn,
+  lineupModalTitle,
+  customLineupForm,
+  battingOrderList,
+  pitcherSelect,
+  lineupError,
+  steal2bBtn,
+  steal3bBtn,
+  stealHomeBtn,
+  pickoff1bBtn,
+  pickoff2bBtn,
+  pickoff3bBtn,
+  simulateFullGameBtn
+} from './ui/domElements';
+import {
+  renderLineups,
+  renderGameState,
+  renderAtBatResult,
+  renderAllAtBatResults,
+  renderGameStateWithButtons
+} from './ui/render';
+import {
+  gameStore,
+  resetGameState,
+  type LoadedTeam,
+  type AtBatLogEntry
+} from './game/state';
 
 // --- Utility: Hardcoded list of available teams ---
 async function fetchAvailableTeams(): Promise<string[]> {
@@ -116,116 +96,6 @@ async function loadTeamFile(filename: string): Promise<LoadedTeam> {
   return { batters, pitchers };
 }
 
-/**
- * @param home - Home team data
- * @param away - Away team data
- */
-function renderLineups(home: LoadedTeam | Roster | null | undefined, away: LoadedTeam | Roster | null | undefined): void {
-  if (!lineupsContainer) return;
-  lineupsContainer.innerHTML = '';
-  
-  /**
-   * @param team - Team data to render
-   * @param label - Team label
-   */
-  const makeTable = (team: LoadedTeam | Roster | null | undefined, label: string): string => {
-    if (!team) return `<div><strong>${label}:</strong> Not loaded</div>`;
-    // Prefer custom lineup/pitcher if present
-    const batters = (team as Roster).lineup || (team as LoadedTeam).batters || [];
-    const pitcher = (team as Roster).pitcher || ((team as LoadedTeam).pitchers && (team as LoadedTeam).pitchers[0]) || { name: 'N/A' };
-    return `
-      <div style="margin-bottom:1.5em;">
-        <strong>${label} Lineup</strong>
-        <table class="lineup-table">
-          <thead><tr><th>#</th><th>Name</th><th>PA</th></tr></thead>
-          <tbody>
-            ${(batters || []).slice(0, 9).map((b: any, i: number) => `<tr><td>${i+1}</td><td>${b.name || ''}</td><td>${b.PA || ''}</td></tr>`).join('')}
-          </tbody>
-        </table>
-        <div><strong>Pitcher:</strong> ${pitcher.name}</div>
-      </div>
-    `;
-  };
-  lineupsContainer.innerHTML = `
-    <div style="display:flex;gap:2em;flex-wrap:wrap;">
-      <div style="flex:1;min-width:250px;">${makeTable(home, 'Home')}</div>
-      <div style="flex:1;min-width:250px;">${makeTable(away, 'Away')}</div>
-    </div>
-  `;
-}
-
-// --- Render game state and current batter ---
-function renderGameState(): void {
-  if (!gameStateContainer) return;
-  if (!gameState || !homeRoster || !awayRoster) {
-    gameStateContainer.innerHTML = '<em>Game not started.</em>';
-    if (nextAtBatBtn) nextAtBatBtn.style.display = 'none';
-    return;
-  }
-  const state = gameState; // safe after null check
-  console.log("here is the game state");
-  console.log('gameState');
-  console.log(state);
-  const { inning, top, outs, bases, score, lineupIndices } = state;
-  const teamIndex = top ? 0 : 1;
-  const matchups = teamIndex === 0 ? awayMatchups : homeMatchups;
-  const roster = teamIndex === 0 ? awayRoster : homeRoster;
-  if (!roster) {
-    gameStateContainer.innerHTML = '<em>Roster not loaded.</em>';
-    if (nextAtBatBtn) nextAtBatBtn.style.display = 'none';
-    return;
-  }
-  const batterIdx = lineupIndices[teamIndex] % (roster.lineup.length);
-  const batter = roster.lineup[batterIdx];
-  const pitcher = (teamIndex === 0 ? homeRoster : awayRoster)!.pitcher;
-  const basesStr = ['1B','2B','3B'].map((b,i) => state.bases[i] ? b : '').filter(Boolean).join(', ') || 'Empty';
-  gameStateContainer.innerHTML = `
-    <div><strong>Inning:</strong> ${inning} (${top ? 'Top' : 'Bottom'})</div>
-    <div><strong>Outs:</strong> ${outs}</div>
-    <div><strong>Bases:</strong> ${basesStr}</div>
-    <div><strong>Score:</strong> Away ${score[0]} &ndash; Home ${score[1]}</div>
-    <div style="margin-top:1em;"><strong>At Bat:</strong> ${batter.name} (vs ${pitcher.name})</div>
-  `;
-  if (nextAtBatBtn) nextAtBatBtn.style.display = '';
-}
-
-/**
- * @param result - At-bat result to render
- * @param isNewHalfInning - Whether this is a new half-inning
- */
-function renderAtBatResult(result: AtBatLogEntry | null, isNewHalfInning = false): void {
-  if (!atbatResultContainer) return;
-  if (!result) return;
-  // Add to persistent log
-  atBatLog.push(result);
-  renderAllAtBatResults();
-}
-
-function renderAllAtBatResults(): void {
-  if (!atbatResultContainer) return;
-  atbatResultContainer.innerHTML = '';
-  let lastInning: number | null = null;
-  let lastTop: boolean | null = null;
-  for (const result of atBatLog) {
-    // Insert inning/half-inning label if needed
-    if (result.inning !== lastInning || result.top !== lastTop) {
-      const labelDiv = document.createElement('div');
-      labelDiv.style.marginTop = '1em';
-      labelDiv.style.fontWeight = 'bold';
-      labelDiv.textContent = `Inning ${result.inning} - ${result.top ? 'Top' : 'Bottom'}`;
-      atbatResultContainer.appendChild(labelDiv);
-      lastInning = result.inning;
-      lastTop = result.top;
-    }
-    // Format base state
-    const basesStr = ['1B','2B','3B'].map((b,i) => result.bases[i] ? b : '').filter(Boolean).join(', ') || 'Empty';
-    // Append new result as a div
-    const div = document.createElement('div');
-    div.innerHTML = `<strong>${result.batterName}:</strong> ${result.outcome} <span style="color:#888">(Outs: ${result.outs}, Score: Away ${result.score[0]} – Home ${result.score[1]}, Bases: ${basesStr})</span>`;
-    atbatResultContainer.appendChild(div);
-  }
-}
-
 // --- Game End Logic ---
 function endGame(winner: 'Home' | 'Away', score: number[], inning: number, lastWasTop: boolean): void {
   // Disable all buttons in the sticky-action-bar
@@ -252,27 +122,30 @@ function endGame(winner: 'Home' | 'Away', score: number[], inning: number, lastW
 
 // --- Start a new game ---
 function startGame(): void {
-  if (!homeRoster || !awayRoster) return;
-  homeMatchups = prepareMatchups(homeRoster);
-  awayMatchups = prepareMatchups(awayRoster);
-  gameState = initGameState();
+  if (!gameStore.homeRoster || !gameStore.awayRoster) return;
+  gameStore.homeMatchups = prepareMatchups(gameStore.homeRoster);
+  gameStore.awayMatchups = prepareMatchups(gameStore.awayRoster);
+  gameStore.gameState = initGameState();
   // Reset persistent at-bat log
-  atBatLog = [];
-  renderAllAtBatResults();
-  renderGameStateWithButtons();
+  gameStore.atBatLog = [];
+  renderAllAtBatResults(gameStore.atBatLog);
+  renderGameStateWithButtons(
+    () => renderGameState(gameStore.gameState, gameStore.homeRoster, gameStore.awayRoster, gameStore.homeMatchups, gameStore.awayMatchups, gameStore.lastRenderedInning, gameStore.lastRenderedTop),
+    updateBaseActionButtons
+  );
 }
 
 // --- Simulate next at-bat ---
 function handleNextAtBat(): void {
-  if (!gameState || !homeMatchups || !awayMatchups) return
-  const state = gameState
+  if (!gameStore.gameState || !gameStore.homeMatchups || !gameStore.awayMatchups) return
+  const state = gameStore.gameState
 
   const teamIndex = state.top ? 0 : 1
-  const roster = teamIndex === 0 ? awayRoster : homeRoster
+  const roster = teamIndex === 0 ? gameStore.awayRoster : gameStore.homeRoster
   if (!roster) return
   const batterIdx = state.lineupIndices[teamIndex] % roster.lineup.length
   const batter = roster.lineup[batterIdx]
-  const result = simulateAtBat(awayMatchups, homeMatchups, state, [], [])
+  const result = simulateAtBat(gameStore.awayMatchups, gameStore.homeMatchups, state, [], [])
 
   // Always log the at-bat result first (before transition)
   renderAtBatResult({
@@ -283,7 +156,7 @@ function handleNextAtBat(): void {
     bases: [...state.bases],
     inning: state.inning,
     top: state.top
-  })
+  }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));
 
   // Check for immediate game end (e.g. walk-off or pre-half-end win)
   const gameEnded = checkGameEnd({
@@ -294,7 +167,10 @@ function handleNextAtBat(): void {
   }, endGame)
 
   if (gameEnded) {
-    renderGameStateWithButtons()
+    renderGameStateWithButtons(
+      () => renderGameState(gameStore.gameState, gameStore.homeRoster, gameStore.awayRoster, gameStore.homeMatchups, gameStore.awayMatchups, gameStore.lastRenderedInning, gameStore.lastRenderedTop),
+      updateBaseActionButtons
+    );
     return
   }
 
@@ -329,8 +205,8 @@ function handleNextAtBat(): void {
       div.innerHTML = `<em>${transitionMsg}</em>`
       atbatResultContainer.appendChild(div)
 
-      lastRenderedInning = state.inning
-      lastRenderedTop = state.top
+      gameStore.lastRenderedInning = state.inning
+      gameStore.lastRenderedTop = state.top
       const labelDiv = document.createElement('div')
       labelDiv.style.marginTop = '1em'
       labelDiv.style.fontWeight = 'bold'
@@ -339,14 +215,17 @@ function handleNextAtBat(): void {
     }
   }
 
-  renderGameStateWithButtons()
+  renderGameStateWithButtons(
+    () => renderGameState(gameStore.gameState, gameStore.homeRoster, gameStore.awayRoster, gameStore.homeMatchups, gameStore.awayMatchups, gameStore.lastRenderedInning, gameStore.lastRenderedTop),
+    updateBaseActionButtons
+  );
 }
 
 function simulateFullGame(): void {
-  if (!gameState || !homeMatchups || !awayMatchups) {
+  if (!gameStore.gameState || !gameStore.homeMatchups || !gameStore.awayMatchups) {
     startGame();
   }
-  while (gameState && nextAtBatBtn && !nextAtBatBtn.disabled) {
+  while (gameStore.gameState && nextAtBatBtn && !nextAtBatBtn.disabled) {
     handleNextAtBat();
   }
 }
@@ -363,37 +242,37 @@ async function loadAndDisplayLineups(): Promise<void> {
       loadTeamFile(homeFile),
       loadTeamFile(awayFile)
     ]);
-    loadedHome = home;
-    loadedAway = away;
+    gameStore.loadedHome = home;
+    gameStore.loadedAway = away;
     // Use custom lineup if set, else default
-    homeRoster = home && home.batters && home.pitchers
+    gameStore.homeRoster = home && home.batters && home.pitchers
       ? buildRoster(
-          customHomeLineup && customHomeLineup.length === 9 ? customHomeLineup : home.batters.slice(0,9).map(b=>b.player_id),
-          customHomePitcher || home.pitchers[0].player_id,
+          gameStore.customHomeLineup && gameStore.customHomeLineup.length === 9 ? gameStore.customHomeLineup : home.batters.slice(0,9).map(b=>b.player_id),
+          gameStore.customHomePitcher || home.pitchers[0].player_id,
           home.batters,
           home.pitchers
         )
       : null;
-    awayRoster = away && away.batters && away.pitchers
+    gameStore.awayRoster = away && away.batters && away.pitchers
       ? buildRoster(
-          customAwayLineup && customAwayLineup.length === 9 ? customAwayLineup : away.batters.slice(0,9).map(b=>b.player_id),
-          customAwayPitcher || away.pitchers[0].player_id,
+          gameStore.customAwayLineup && gameStore.customAwayLineup.length === 9 ? gameStore.customAwayLineup : away.batters.slice(0,9).map(b=>b.player_id),
+          gameStore.customAwayPitcher || away.pitchers[0].player_id,
           away.batters,
           away.pitchers
         )
       : null;
     // Render the actual lineups that will be used in the game
-    renderLineups(homeRoster, awayRoster);
+    renderLineups(gameStore.homeRoster, gameStore.awayRoster);
     // Reset persistent at-bat log
-    atBatLog = [];
-    renderAllAtBatResults();
+    gameStore.atBatLog = [];
+    renderAllAtBatResults(gameStore.atBatLog);
     statusDiv.textContent = 'Lineups loaded. Ready to simulate!';
 
     // --- Debug: Dump normalized rosters for both teams ---
     console.log('--- Home Roster (normalized, ready for engine) ---');
-    console.log(JSON.stringify(homeRoster, null, 2));
+    console.log(JSON.stringify(gameStore.homeRoster, null, 2));
     console.log('--- Away Roster (normalized, ready for engine) ---');
-    console.log(JSON.stringify(awayRoster, null, 2));
+    console.log(JSON.stringify(gameStore.awayRoster, null, 2));
 
     startGame();
   } catch (err) {
@@ -433,35 +312,35 @@ async function populateTeamDropdowns(): Promise<void> {
  * Update rosters with new lineups without resetting game state
  */
 function updateRostersWithNewLineups(): void {
-  if (!loadedHome || !loadedAway) return;
+  if (!gameStore.loadedHome || !gameStore.loadedAway) return;
   
   // Rebuild rosters with current custom lineups
-  homeRoster = loadedHome && loadedHome.batters && loadedHome.pitchers
+  gameStore.homeRoster = gameStore.loadedHome && gameStore.loadedHome.batters && gameStore.loadedHome.pitchers
     ? buildRoster(
-        customHomeLineup && customHomeLineup.length === 9 ? customHomeLineup : loadedHome.batters.slice(0,9).map(b=>b.player_id),
-        customHomePitcher || loadedHome.pitchers[0].player_id,
-        loadedHome.batters,
-        loadedHome.pitchers
+        gameStore.customHomeLineup && gameStore.customHomeLineup.length === 9 ? gameStore.customHomeLineup : gameStore.loadedHome.batters.slice(0,9).map(b=>b.player_id),
+        gameStore.customHomePitcher || gameStore.loadedHome.pitchers[0].player_id,
+        gameStore.loadedHome.batters,
+        gameStore.loadedHome.pitchers
       )
     : null;
-  awayRoster = loadedAway && loadedAway.batters && loadedAway.pitchers
+  gameStore.awayRoster = gameStore.loadedAway && gameStore.loadedAway.batters && gameStore.loadedAway.pitchers
     ? buildRoster(
-        customAwayLineup && customAwayLineup.length === 9 ? customAwayLineup : loadedAway.batters.slice(0,9).map(b=>b.player_id),
-        customAwayPitcher || loadedAway.pitchers[0].player_id,
-        loadedAway.batters,
-        loadedAway.pitchers
+        gameStore.customAwayLineup && gameStore.customAwayLineup.length === 9 ? gameStore.customAwayLineup : gameStore.loadedAway.batters.slice(0,9).map(b=>b.player_id),
+        gameStore.customAwayPitcher || gameStore.loadedAway.pitchers[0].player_id,
+        gameStore.loadedAway.batters,
+        gameStore.loadedAway.pitchers
       )
     : null;
   
   // Rebuild matchups for future at-bats
-  if (homeRoster && awayRoster) {
-    homeMatchups = prepareMatchups({ lineup: homeRoster.lineup, pitcher: awayRoster.pitcher });
-    awayMatchups = prepareMatchups({ lineup: awayRoster.lineup, pitcher: homeRoster.pitcher });
+  if (gameStore.homeRoster && gameStore.awayRoster) {
+    gameStore.homeMatchups = prepareMatchups({ lineup: gameStore.homeRoster.lineup, pitcher: gameStore.awayRoster.pitcher });
+    gameStore.awayMatchups = prepareMatchups({ lineup: gameStore.awayRoster.lineup, pitcher: gameStore.homeRoster.pitcher });
   }
   
   // Update the display
-  renderLineups(homeRoster, awayRoster);
-  renderGameState();
+  renderLineups(gameStore.homeRoster, gameStore.awayRoster);
+  renderGameState(gameStore.gameState, gameStore.homeRoster, gameStore.awayRoster, gameStore.homeMatchups, gameStore.awayMatchups, gameStore.lastRenderedInning, gameStore.lastRenderedTop);
 }
 
 /**
@@ -472,7 +351,7 @@ function updateRostersWithNewLineups(): void {
  * @param currentPitcher - Current pitcher
  */
 function showLineupModal(team: 'home' | 'away', batters: NormalizedBatter[], pitchers: NormalizedPitcher[], currentLineup: string[] | null, currentPitcher: string | null): void {
-  editingTeam = team;
+  gameStore.editingTeam = team;
   if (!lineupModal || !lineupModalTitle || !battingOrderList || !pitcherSelect) return;
   lineupModalTitle.textContent = `Customize ${team === 'home' ? 'Home' : 'Away'} Lineup`;
   if (lineupError) lineupError.textContent = '';
@@ -481,12 +360,12 @@ function showLineupModal(team: 'home' | 'away', batters: NormalizedBatter[], pit
   // Use the current roster's lineup/pitcher if available
   let effectiveLineup = currentLineup;
   let effectivePitcher = currentPitcher;
-  if (team === 'home' && homeRoster) {
-    effectiveLineup = homeRoster.lineup ? homeRoster.lineup.map(b => b.player_id) : currentLineup;
-    effectivePitcher = homeRoster.pitcher ? homeRoster.pitcher.player_id : currentPitcher;
-  } else if (team === 'away' && awayRoster) {
-    effectiveLineup = awayRoster.lineup ? awayRoster.lineup.map(b => b.player_id) : currentLineup;
-    effectivePitcher = awayRoster.pitcher ? awayRoster.pitcher.player_id : currentPitcher;
+  if (team === 'home' && gameStore.homeRoster) {
+    effectiveLineup = gameStore.homeRoster.lineup ? gameStore.homeRoster.lineup.map(b => b.player_id) : currentLineup;
+    effectivePitcher = gameStore.homeRoster.pitcher ? gameStore.homeRoster.pitcher.player_id : currentPitcher;
+  } else if (team === 'away' && gameStore.awayRoster) {
+    effectiveLineup = gameStore.awayRoster.lineup ? gameStore.awayRoster.lineup.map(b => b.player_id) : currentLineup;
+    effectivePitcher = gameStore.awayRoster.pitcher ? gameStore.awayRoster.pitcher.player_id : currentPitcher;
   }
 
   // Batting order dropdowns
@@ -510,20 +389,15 @@ function showLineupModal(team: 'home' | 'away', batters: NormalizedBatter[], pit
 }
 
 function updateBaseActionButtons(): void {
-  if (!gameState) return;
+  if (!gameStore.gameState) return;
   // Steal buttons: enable if runner present on base
-  if (steal2bBtn) steal2bBtn.disabled = !gameState.bases[0];
-  if (steal3bBtn) steal3bBtn.disabled = !gameState.bases[1];
-  if (stealHomeBtn) stealHomeBtn.disabled = !gameState.bases[2];
+  if (steal2bBtn) steal2bBtn.disabled = !gameStore.gameState.bases[0];
+  if (steal3bBtn) steal3bBtn.disabled = !gameStore.gameState.bases[1];
+  if (stealHomeBtn) stealHomeBtn.disabled = !gameStore.gameState.bases[2];
   // Pickoff buttons: enable if runner present on base
-  if (pickoff1bBtn) pickoff1bBtn.disabled = !gameState.bases[0];
-  if (pickoff2bBtn) pickoff2bBtn.disabled = !gameState.bases[1];
-  if (pickoff3bBtn) pickoff3bBtn.disabled = !gameState.bases[2];
-}
-
-function renderGameStateWithButtons(): void {
-  renderGameState();
-  updateBaseActionButtons();
+  if (pickoff1bBtn) pickoff1bBtn.disabled = !gameStore.gameState.bases[0];
+  if (pickoff2bBtn) pickoff2bBtn.disabled = !gameStore.gameState.bases[1];
+  if (pickoff3bBtn) pickoff3bBtn.disabled = !gameStore.gameState.bases[2];
 }
 
 // --- Event listeners ---
@@ -535,14 +409,14 @@ if (awaySelect) awaySelect.addEventListener('change', loadAndDisplayLineups);
 if (nextAtBatBtn) nextAtBatBtn.addEventListener('click', handleNextAtBat);
 if (customizeHomeBtn) {
   customizeHomeBtn.addEventListener('click', () => {
-    if (!loadedHome) return;
-    showLineupModal('home', loadedHome.batters, loadedHome.pitchers, customHomeLineup, customHomePitcher);
+    if (!gameStore.loadedHome) return;
+    showLineupModal('home', gameStore.loadedHome.batters, gameStore.loadedHome.pitchers, gameStore.customHomeLineup, gameStore.customHomePitcher);
   });
 }
 if (customizeAwayBtn) {
   customizeAwayBtn.addEventListener('click', () => {
-    if (!loadedAway) return;
-    showLineupModal('away', loadedAway.batters, loadedAway.pitchers, customAwayLineup, customAwayPitcher);
+    if (!gameStore.loadedAway) return;
+    showLineupModal('away', gameStore.loadedAway.batters, gameStore.loadedAway.pitchers, gameStore.customAwayLineup, gameStore.customAwayPitcher);
   });
 }
 if (closeLineupModalBtn) {
@@ -578,12 +452,12 @@ if (customLineupForm) {
       return;
     }
     // Save
-    if (editingTeam === 'home') {
-      customHomeLineup = lineup;
-      customHomePitcher = pitcher;
+    if (gameStore.editingTeam === 'home') {
+      gameStore.customHomeLineup = lineup;
+      gameStore.customHomePitcher = pitcher;
     } else {
-      customAwayLineup = lineup;
-      customAwayPitcher = pitcher;
+      gameStore.customAwayLineup = lineup;
+      gameStore.customAwayPitcher = pitcher;
     }
     if (lineupModal) lineupModal.style.display = 'none';
     
@@ -599,125 +473,142 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // Steal event handlers
 if (steal2bBtn) steal2bBtn.addEventListener('click', () => {
-  if (!gameState || !homeRoster || !awayRoster) return;
+  if (!gameStore.gameState || !gameStore.homeRoster || !gameStore.awayRoster) return;
   // Assume away team is batting if top, home if bottom
-  const teamIndex = gameState.top ? 0 : 1;
-  const roster = teamIndex === 0 ? awayRoster : homeRoster;
+  const teamIndex = gameStore.gameState.top ? 0 : 1;
+  const roster = teamIndex === 0 ? gameStore.awayRoster : gameStore.homeRoster;
   // Find runner on 1B (first in lineup who is not at bat)
   const runner = roster.lineup.find(b => true) || {};
-  const pitcher = (teamIndex === 0 ? homeRoster : awayRoster)!.pitcher;
-  const catcher = (teamIndex === 0 ? homeRoster : awayRoster)!.lineup[0] || {};
-  const result = attemptSteal(2, gameState, runner, pitcher, catcher, 1);
+  const pitcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.pitcher;
+  const catcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.lineup[0] || {};
+  const result = attemptSteal(2, gameStore.gameState, runner, pitcher, catcher, 1);
   renderAtBatResult({
     batterName: 'Runner',
     outcome: result.description,
-    outs: gameState.outs,
-    score: [...gameState.score],
-    bases: [...gameState.bases],
-    inning: gameState.inning,
-    top: gameState.top
-  });
-  renderGameStateWithButtons();
+    outs: gameStore.gameState.outs,
+    score: [...gameStore.gameState.score],
+    bases: [...gameStore.gameState.bases],
+    inning: gameStore.gameState.inning,
+    top: gameStore.gameState.top
+  }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));
+  renderGameStateWithButtons(
+    () => renderGameState(gameStore.gameState, gameStore.homeRoster, gameStore.awayRoster, gameStore.homeMatchups, gameStore.awayMatchups, gameStore.lastRenderedInning, gameStore.lastRenderedTop),
+    updateBaseActionButtons
+  );
 });
 if (steal3bBtn) steal3bBtn.addEventListener('click', () => {
-  if (!gameState || !homeRoster || !awayRoster) return;
-  const teamIndex = gameState.top ? 0 : 1;
-  const roster = teamIndex === 0 ? awayRoster : homeRoster;
+  if (!gameStore.gameState || !gameStore.homeRoster || !gameStore.awayRoster) return;
+  const teamIndex = gameStore.gameState.top ? 0 : 1;
+  const roster = teamIndex === 0 ? gameStore.awayRoster : gameStore.homeRoster;
   const runner = roster.lineup.find(b => true) || {};
-  const pitcher = (teamIndex === 0 ? homeRoster : awayRoster)!.pitcher;
-  const catcher = (teamIndex === 0 ? homeRoster : awayRoster)!.lineup[0] || {};
-  const result = attemptSteal(3, gameState, runner, pitcher, catcher, 2);
+  const pitcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.pitcher;
+  const catcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.lineup[0] || {};
+  const result = attemptSteal(3, gameStore.gameState, runner, pitcher, catcher, 2);
   renderAtBatResult({
     batterName: 'Runner',
     outcome: result.description,
-    outs: gameState.outs,
-    score: [...gameState.score],
-    bases: [...gameState.bases],
-    inning: gameState.inning,
-    top: gameState.top
-  });
-  renderGameStateWithButtons();
+    outs: gameStore.gameState.outs,
+    score: [...gameStore.gameState.score],
+    bases: [...gameStore.gameState.bases],
+    inning: gameStore.gameState.inning,
+    top: gameStore.gameState.top
+  }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));
+  renderGameStateWithButtons(
+    () => renderGameState(gameStore.gameState, gameStore.homeRoster, gameStore.awayRoster, gameStore.homeMatchups, gameStore.awayMatchups, gameStore.lastRenderedInning, gameStore.lastRenderedTop),
+    updateBaseActionButtons
+  );
 });
 if (stealHomeBtn) stealHomeBtn.addEventListener('click', () => {
-  if (!gameState || !homeRoster || !awayRoster) return;
-  const teamIndex = gameState.top ? 0 : 1;
-  const roster = teamIndex === 0 ? awayRoster : homeRoster;
+  if (!gameStore.gameState || !gameStore.homeRoster || !gameStore.awayRoster) return;
+  const teamIndex = gameStore.gameState.top ? 0 : 1;
+  const roster = teamIndex === 0 ? gameStore.awayRoster : gameStore.homeRoster;
   const runner = roster.lineup.find(b => true) || {};
-  const pitcher = (teamIndex === 0 ? homeRoster : awayRoster)!.pitcher;
-  const catcher = (teamIndex === 0 ? homeRoster : awayRoster)!.lineup[0] || {};
-  const result = attemptSteal(4, gameState, runner, pitcher, catcher, 3);
+  const pitcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.pitcher;
+  const catcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.lineup[0] || {};
+  const result = attemptSteal(4, gameStore.gameState, runner, pitcher, catcher, 3);
   renderAtBatResult({
     batterName: 'Runner',
     outcome: result.description,
-    outs: gameState.outs,
-    score: [...gameState.score],
-    bases: [...gameState.bases],
-    inning: gameState.inning,
-    top: gameState.top
-  });
-  renderGameStateWithButtons();
+    outs: gameStore.gameState.outs,
+    score: [...gameStore.gameState.score],
+    bases: [...gameStore.gameState.bases],
+    inning: gameStore.gameState.inning,
+    top: gameStore.gameState.top
+  }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));
+  renderGameStateWithButtons(
+    () => renderGameState(gameStore.gameState, gameStore.homeRoster, gameStore.awayRoster, gameStore.homeMatchups, gameStore.awayMatchups, gameStore.lastRenderedInning, gameStore.lastRenderedTop),
+    updateBaseActionButtons
+  );
 });
 // Pickoff event handlers
 if (pickoff1bBtn) pickoff1bBtn.addEventListener('click', () => {
-  if (!gameState || !homeRoster || !awayRoster) return;
-  const teamIndex = gameState.top ? 0 : 1;
-  const roster = teamIndex === 0 ? awayRoster : homeRoster;
+  if (!gameStore.gameState || !gameStore.homeRoster || !gameStore.awayRoster) return;
+  const teamIndex = gameStore.gameState.top ? 0 : 1;
+  const roster = teamIndex === 0 ? gameStore.awayRoster : gameStore.homeRoster;
   const runner = roster.lineup.find(b => true) || {};
-  const pitcher = (teamIndex === 0 ? homeRoster : awayRoster)!.pitcher;
-  const fielder = (teamIndex === 0 ? homeRoster : awayRoster)!.lineup[0] || {};
-  const result = attemptPickoff(1, gameState, runner, pitcher, fielder);
+  const pitcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.pitcher;
+  const fielder = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.lineup[0] || {};
+  const result = attemptPickoff(1, gameStore.gameState, runner, pitcher, fielder);
   renderAtBatResult({
     batterName: 'Runner',
     outcome: result.description,
-    outs: gameState.outs,
-    score: [...gameState.score],
-    bases: [...gameState.bases],
-    inning: gameState.inning,
-    top: gameState.top
-  });
-  renderGameStateWithButtons();
+    outs: gameStore.gameState.outs,
+    score: [...gameStore.gameState.score],
+    bases: [...gameStore.gameState.bases],
+    inning: gameStore.gameState.inning,
+    top: gameStore.gameState.top
+  }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));
+  renderGameStateWithButtons(
+    () => renderGameState(gameStore.gameState, gameStore.homeRoster, gameStore.awayRoster, gameStore.homeMatchups, gameStore.awayMatchups, gameStore.lastRenderedInning, gameStore.lastRenderedTop),
+    updateBaseActionButtons
+  );
 });
 if (pickoff2bBtn) pickoff2bBtn.addEventListener('click', () => {
-  if (!gameState || !homeRoster || !awayRoster) return;
-  const teamIndex = gameState.top ? 0 : 1;
-  const roster = teamIndex === 0 ? awayRoster : homeRoster;
+  if (!gameStore.gameState || !gameStore.homeRoster || !gameStore.awayRoster) return;
+  const teamIndex = gameStore.gameState.top ? 0 : 1;
+  const roster = teamIndex === 0 ? gameStore.awayRoster : gameStore.homeRoster;
   const runner = roster.lineup.find(b => true) || {};
-  const pitcher = (teamIndex === 0 ? homeRoster : awayRoster)!.pitcher;
-  const fielder = (teamIndex === 0 ? homeRoster : awayRoster)!.lineup[0] || {};
-  const result = attemptPickoff(2, gameState, runner, pitcher, fielder);
+  const pitcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.pitcher;
+  const fielder = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.lineup[0] || {};
+  const result = attemptPickoff(2, gameStore.gameState, runner, pitcher, fielder);
   renderAtBatResult({
     batterName: 'Runner',
     outcome: result.description,
-    outs: gameState.outs,
-    score: [...gameState.score],
-    bases: [...gameState.bases],
-    inning: gameState.inning,
-    top: gameState.top
-  });
-  renderGameStateWithButtons();
+    outs: gameStore.gameState.outs,
+    score: [...gameStore.gameState.score],
+    bases: [...gameStore.gameState.bases],
+    inning: gameStore.gameState.inning,
+    top: gameStore.gameState.top
+  }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));
+  renderGameStateWithButtons(
+    () => renderGameState(gameStore.gameState, gameStore.homeRoster, gameStore.awayRoster, gameStore.homeMatchups, gameStore.awayMatchups, gameStore.lastRenderedInning, gameStore.lastRenderedTop),
+    updateBaseActionButtons
+  );
 });
 if (pickoff3bBtn) pickoff3bBtn.addEventListener('click', () => {
-  if (!gameState || !homeRoster || !awayRoster) return;
-  const teamIndex = gameState.top ? 0 : 1;
-  const roster = teamIndex === 0 ? awayRoster : homeRoster;
+  if (!gameStore.gameState || !gameStore.homeRoster || !gameStore.awayRoster) return;
+  const teamIndex = gameStore.gameState.top ? 0 : 1;
+  const roster = teamIndex === 0 ? gameStore.awayRoster : gameStore.homeRoster;
   const runner = roster.lineup.find(b => true) || {};
-  const pitcher = (teamIndex === 0 ? homeRoster : awayRoster)!.pitcher;
-  const fielder = (teamIndex === 0 ? homeRoster : awayRoster)!.lineup[0] || {};
-  const result = attemptPickoff(3, gameState, runner, pitcher, fielder);
+  const pitcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.pitcher;
+  const fielder = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.lineup[0] || {};
+  const result = attemptPickoff(3, gameStore.gameState, runner, pitcher, fielder);
   renderAtBatResult({
     batterName: 'Runner',
     outcome: result.description,
-    outs: gameState.outs,
-    score: [...gameState.score],
-    bases: [...gameState.bases],
-    inning: gameState.inning,
-    top: gameState.top
-  });
-  renderGameStateWithButtons();
+    outs: gameStore.gameState.outs,
+    score: [...gameStore.gameState.score],
+    bases: [...gameStore.gameState.bases],
+    inning: gameStore.gameState.inning,
+    top: gameStore.gameState.top
+  }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));
+  renderGameStateWithButtons(
+    () => renderGameState(gameStore.gameState, gameStore.homeRoster, gameStore.awayRoster, gameStore.homeMatchups, gameStore.awayMatchups, gameStore.lastRenderedInning, gameStore.lastRenderedTop),
+    updateBaseActionButtons
+  );
 });
 
 // Wire up the button if present
-const simulateFullGameBtn = document.getElementById('simulate-full-game-btn') as HTMLButtonElement | null;
 if (simulateFullGameBtn) {
   simulateFullGameBtn.addEventListener('click', simulateFullGame);
 } 
