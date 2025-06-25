@@ -278,16 +278,6 @@
               
                 
                 <li><a
-                  href='#_applyremainingdefaultoptions'
-                  class="">
-                  _applyRemainingDefaultOptions
-                  
-                </a>
-                
-                </li>
-              
-                
-                <li><a
                   href='#fallbackidfromname'
                   class="">
                   fallbackIdFromName
@@ -358,16 +348,6 @@
               
                 
                 <li><a
-                  href='#checkgameend'
-                  class="">
-                  checkGameEnd
-                  
-                </a>
-                
-                </li>
-              
-                
-                <li><a
                   href='#initgamestate'
                   class="">
                   initGameState
@@ -378,59 +358,9 @@
               
                 
                 <li><a
-                  href='#istouchdevice'
+                  href='#checkgameend'
                   class="">
-                  isTouchDevice
-                  
-                </a>
-                
-                </li>
-              
-                
-                <li><a
-                  href='#add'
-                  class="">
-                  add
-                  
-                </a>
-                
-                </li>
-              
-                
-                <li><a
-                  href='#remove'
-                  class="">
-                  remove
-                  
-                </a>
-                
-                </li>
-              
-                
-                <li><a
-                  href='#removeall'
-                  class="">
-                  removeAll
-                  
-                </a>
-                
-                </li>
-              
-                
-                <li><a
-                  href='#urlify'
-                  class="">
-                  urlify
-                  
-                </a>
-                
-                </li>
-              
-                
-                <li><a
-                  href='#hasanchorjslink'
-                  class="">
-                  hasAnchorJSLink
+                  checkGameEnd
                   
                 </a>
                 
@@ -571,26 +501,6 @@
                   href='#normalizefieldingstats'
                   class="">
                   normalizeFieldingStats
-                  
-                </a>
-                
-                </li>
-              
-                
-                <li><a
-                  href='#_getelements'
-                  class="">
-                  _getElements
-                  
-                </a>
-                
-                </li>
-              
-                
-                <li><a
-                  href='#_addbaselinestyles'
-                  class="">
-                  _addBaselineStyles
                   
                 </a>
                 
@@ -2412,9 +2322,10 @@ Designed to be used server-side (e.g. in Bun) to avoid browser CORS limitations.
   </div>
   
 
-  <p>Evaluates whether the game should end due to a walk-off condition.
-This only applies in the bottom of the 9th inning or later.
-Returns true if game ended immediately due to walk-off.</p>
+  <p>Evaluates whether the game should end due to a walk-off.
+Should be called immediately after the home team scores a run during
+the bottom of the 9th inning or later.</p>
+<p>Returns true if the game ended immediately due to a walk-off.</p>
 
     <div class='pre p1 fill-light mt0'>checkWalkoff(gameState: <a href="#gamestatelike">GameStateLike</a>, endGameFn: function (winner: <code>"Home"</code>, score: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array">Array</a>&#x3C;<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>>, inning: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, lastWasTop: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>): void): <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a></div>
   
@@ -2457,70 +2368,6 @@ Returns true if game ended immediately due to walk-off.</p>
       <div class='py1 quiet mt1 prose-big'>Returns</div>
       <code><a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a></code>
     
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-</section>
-
-          
-        
-          
-          <section class='p2 mb2 clearfix bg-white minishadow'>
-
-  
-  <div class='clearfix'>
-    
-    <h3 class='fl m0' id='_applyremainingdefaultoptions'>
-      _applyRemainingDefaultOptions
-    </h3>
-    
-    
-  </div>
-  
-
-  <p>Assigns options to the internal options object, and provides defaults.</p>
-
-    <div class='pre p1 fill-light mt0'>_applyRemainingDefaultOptions(opts: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object">Object</a>)</div>
-  
-  
-
-  
-  
-  
-  
-  
-  
-
-  
-    <div class='py1 quiet mt1 prose-big'>Parameters</div>
-    <div class='prose'>
-      
-        <div class='space-bottom0'>
-          <div>
-            <span class='code bold'>opts</span> <code class='quiet'>(<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object">Object</a>)</code>
-	    Options object
-
-          </div>
-          
-        </div>
-      
-    </div>
-  
-
-  
-
   
 
   
@@ -3044,84 +2891,6 @@ Handles cases where  contains row numbers, and name is in first .</p>
   
   <div class='clearfix'>
     
-    <h3 class='fl m0' id='checkgameend'>
-      checkGameEnd
-    </h3>
-    
-    
-  </div>
-  
-
-  <p>Checks whether the game should end after a half-inning concludes.
-Should be called after a half-inning ends (e.g., after 3 outs).
-It accounts for regulation and extra-inning scenarios.</p>
-
-    <div class='pre p1 fill-light mt0'>checkGameEnd(gameState: <a href="#gamestatelike">GameStateLike</a>, endGameFn: function (winner: (<code>"Home"</code> | <code>"Away"</code>), score: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array">Array</a>&#x3C;<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>>, inning: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, lastWasTop: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>): void): void</div>
-  
-  
-
-  
-  
-  
-  
-  
-  
-
-  
-    <div class='py1 quiet mt1 prose-big'>Parameters</div>
-    <div class='prose'>
-      
-        <div class='space-bottom0'>
-          <div>
-            <span class='code bold'>gameState</span> <code class='quiet'>(<a href="#gamestatelike">GameStateLike</a>)</code>
-	    
-          </div>
-          
-        </div>
-      
-        <div class='space-bottom0'>
-          <div>
-            <span class='code bold'>endGameFn</span> <code class='quiet'>(function (winner: (<code>"Home"</code> | <code>"Away"</code>), score: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array">Array</a>&#x3C;<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>>, inning: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, lastWasTop: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>): void)</code>
-	    
-          </div>
-          
-        </div>
-      
-    </div>
-  
-
-  
-
-  
-    
-      <div class='py1 quiet mt1 prose-big'>Returns</div>
-      <code>void</code>
-    
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-</section>
-
-          
-        
-          
-          <section class='p2 mb2 clearfix bg-white minishadow'>
-
-  
-  <div class='clearfix'>
-    
     <h3 class='fl m0' id='initgamestate'>
       initGameState
     </h3>
@@ -3180,76 +2949,20 @@ It accounts for regulation and extra-inning scenarios.</p>
   
   <div class='clearfix'>
     
-    <h3 class='fl m0' id='istouchdevice'>
-      isTouchDevice
+    <h3 class='fl m0' id='checkgameend'>
+      checkGameEnd
     </h3>
     
     
   </div>
   
 
-  <p>Checks to see if this device supports touch. Uses criteria pulled from Modernizr:
-<a href="https://github.com/Modernizr/Modernizr/blob/da22eb27631fc4957f67607fe6042e85c0a84656/feature-detects/touchevents.js#L40">https://github.com/Modernizr/Modernizr/blob/da22eb27631fc4957f67607fe6042e85c0a84656/feature-detects/touchevents.js#L40</a></p>
+  <p>Evaluates whether the game should end after a half-inning concludes.
+This should be called <em>only after</em> the 3rd out, when the half-inning has ended
+and the game state has transitioned to the next inning half.</p>
+<p>Assumes checkWalkoff has already been called (if relevant) during the bottom half.</p>
 
-    <div class='pre p1 fill-light mt0'>isTouchDevice(): <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">Boolean</a></div>
-  
-  
-
-  
-  
-  
-  
-  
-  
-
-  
-
-  
-
-  
-    
-      <div class='py1 quiet mt1 prose-big'>Returns</div>
-      <code><a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">Boolean</a></code>:
-        true if the current device supports touch.
-
-      
-    
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-</section>
-
-          
-        
-          
-          <section class='p2 mb2 clearfix bg-white minishadow'>
-
-  
-  <div class='clearfix'>
-    
-    <h3 class='fl m0' id='add'>
-      add
-    </h3>
-    
-    
-  </div>
-  
-
-  <p>Add anchor links to page elements.</p>
-
-    <div class='pre p1 fill-light mt0'>add(selector: (<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String">String</a> | <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array">Array</a> | <a href="https://developer.mozilla.org/docs/Web/API/NodeList">Nodelist</a>)): this</div>
+    <div class='pre p1 fill-light mt0'>checkGameEnd(gameState: <a href="#gamestatelike">GameStateLike</a>, endGameFn: function (winner: (<code>"Home"</code> | <code>"Away"</code>), score: [<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>], inning: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, lastWasTop: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>): void): <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a></div>
   
   
 
@@ -3266,83 +2979,16 @@ It accounts for regulation and extra-inning scenarios.</p>
       
         <div class='space-bottom0'>
           <div>
-            <span class='code bold'>selector</span> <code class='quiet'>((<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String">String</a> | <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array">Array</a> | <a href="https://developer.mozilla.org/docs/Web/API/NodeList">Nodelist</a>))</code>
-	    A CSS selector for targeting the elements you wish to add anchor links
-to. Also accepts an array or nodeList containing the relavant elements.
-
+            <span class='code bold'>gameState</span> <code class='quiet'>(<a href="#gamestatelike">GameStateLike</a>)</code>
+	    
           </div>
           
         </div>
-      
-    </div>
-  
-
-  
-
-  
-    
-      <div class='py1 quiet mt1 prose-big'>Returns</div>
-      <code>this</code>:
-        The AnchorJS object
-
-      
-    
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-</section>
-
-          
-        
-          
-          <section class='p2 mb2 clearfix bg-white minishadow'>
-
-  
-  <div class='clearfix'>
-    
-    <h3 class='fl m0' id='remove'>
-      remove
-    </h3>
-    
-    
-  </div>
-  
-
-  <p>Removes all anchorjs-links from elements targed by the selector.</p>
-
-    <div class='pre p1 fill-light mt0'>remove(selector: (<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String">String</a> | <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array">Array</a> | <a href="https://developer.mozilla.org/docs/Web/API/NodeList">Nodelist</a>)): this</div>
-  
-  
-
-  
-  
-  
-  
-  
-  
-
-  
-    <div class='py1 quiet mt1 prose-big'>Parameters</div>
-    <div class='prose'>
       
         <div class='space-bottom0'>
           <div>
-            <span class='code bold'>selector</span> <code class='quiet'>((<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String">String</a> | <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array">Array</a> | <a href="https://developer.mozilla.org/docs/Web/API/NodeList">Nodelist</a>))</code>
-	    A CSS selector string targeting elements with anchor links,
-OR a nodeList / array containing the DOM elements.
-
+            <span class='code bold'>endGameFn</span> <code class='quiet'>(function (winner: (<code>"Home"</code> | <code>"Away"</code>), score: [<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>], inning: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, lastWasTop: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>): void)</code>
+	    
           </div>
           
         </div>
@@ -3355,207 +3001,7 @@ OR a nodeList / array containing the DOM elements.
   
     
       <div class='py1 quiet mt1 prose-big'>Returns</div>
-      <code>this</code>:
-        The AnchorJS object
-
-      
-    
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-</section>
-
-          
-        
-          
-          <section class='p2 mb2 clearfix bg-white minishadow'>
-
-  
-  <div class='clearfix'>
-    
-    <h3 class='fl m0' id='removeall'>
-      removeAll
-    </h3>
-    
-    
-  </div>
-  
-
-  <p>Removes all anchorjs links. Mostly used for tests.</p>
-
-    <div class='pre p1 fill-light mt0'>removeAll()</div>
-  
-  
-
-  
-  
-  
-  
-  
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-</section>
-
-          
-        
-          
-          <section class='p2 mb2 clearfix bg-white minishadow'>
-
-  
-  <div class='clearfix'>
-    
-    <h3 class='fl m0' id='urlify'>
-      urlify
-    </h3>
-    
-    
-  </div>
-  
-
-  <p>Urlify - Refine text so it makes a good ID.</p>
-<p>To do this, we remove apostrophes, replace nonsafe characters with hyphens,
-remove extra hyphens, truncate, trim hyphens, and make lowercase.</p>
-
-    <div class='pre p1 fill-light mt0'>urlify(text: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String">String</a>): <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String">String</a></div>
-  
-  
-
-  
-  
-  
-  
-  
-  
-
-  
-    <div class='py1 quiet mt1 prose-big'>Parameters</div>
-    <div class='prose'>
-      
-        <div class='space-bottom0'>
-          <div>
-            <span class='code bold'>text</span> <code class='quiet'>(<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String">String</a>)</code>
-	    Any text. Usually pulled from the webpage element we are linking to.
-
-          </div>
-          
-        </div>
-      
-    </div>
-  
-
-  
-
-  
-    
-      <div class='py1 quiet mt1 prose-big'>Returns</div>
-      <code><a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String">String</a></code>:
-        hyphen-delimited text for use in IDs and URLs.
-
-      
-    
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-</section>
-
-          
-        
-          
-          <section class='p2 mb2 clearfix bg-white minishadow'>
-
-  
-  <div class='clearfix'>
-    
-    <h3 class='fl m0' id='hasanchorjslink'>
-      hasAnchorJSLink
-    </h3>
-    
-    
-  </div>
-  
-
-  <p>Determines if this element already has an AnchorJS link on it.
-Uses this technique: <a href="http://stackoverflow.com/a/5898748/1154642">http://stackoverflow.com/a/5898748/1154642</a></p>
-
-    <div class='pre p1 fill-light mt0'>hasAnchorJSLink(el: HTMLElemnt): <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">Boolean</a></div>
-  
-  
-
-  
-  
-  
-  
-  
-  
-
-  
-    <div class='py1 quiet mt1 prose-big'>Parameters</div>
-    <div class='prose'>
-      
-        <div class='space-bottom0'>
-          <div>
-            <span class='code bold'>el</span> <code class='quiet'>(HTMLElemnt)</code>
-	    a DOM node
-
-          </div>
-          
-        </div>
-      
-    </div>
-  
-
-  
-
-  
-    
-      <div class='py1 quiet mt1 prose-big'>Returns</div>
-      <code><a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">Boolean</a></code>:
-        true/false
-
-      
+      <code><a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a></code>
     
   
 
@@ -4769,131 +4215,6 @@ Mutates gameState.bases.</p>
 
       
     
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-</section>
-
-          
-        
-          
-          <section class='p2 mb2 clearfix bg-white minishadow'>
-
-  
-  <div class='clearfix'>
-    
-    <h3 class='fl m0' id='_getelements'>
-      _getElements
-    </h3>
-    
-    
-  </div>
-  
-
-  <p>Turns a selector, nodeList, or array of elements into an array of elements (so we can use array methods).
-It also throws errors on any other inputs. Used to handle inputs to .add and .remove.</p>
-
-    <div class='pre p1 fill-light mt0'>_getElements(input: (<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String">String</a> | <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array">Array</a> | <a href="https://developer.mozilla.org/docs/Web/API/NodeList">Nodelist</a>)): <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array">Array</a></div>
-  
-  
-
-  
-  
-  
-  
-  
-  
-
-  
-    <div class='py1 quiet mt1 prose-big'>Parameters</div>
-    <div class='prose'>
-      
-        <div class='space-bottom0'>
-          <div>
-            <span class='code bold'>input</span> <code class='quiet'>((<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/String">String</a> | <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array">Array</a> | <a href="https://developer.mozilla.org/docs/Web/API/NodeList">Nodelist</a>))</code>
-	    A CSS selector string targeting elements with anchor links,
-OR a nodeList / array containing the DOM elements.
-
-          </div>
-          
-        </div>
-      
-    </div>
-  
-
-  
-
-  
-    
-      <div class='py1 quiet mt1 prose-big'>Returns</div>
-      <code><a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array">Array</a></code>:
-        An array containing the elements we want.
-
-      
-    
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-</section>
-
-          
-        
-          
-          <section class='p2 mb2 clearfix bg-white minishadow'>
-
-  
-  <div class='clearfix'>
-    
-    <h3 class='fl m0' id='_addbaselinestyles'>
-      _addBaselineStyles
-    </h3>
-    
-    
-  </div>
-  
-
-  <p>_addBaselineStyles
-Adds baseline styles to the page, used by all AnchorJS links irregardless of configuration.</p>
-
-    <div class='pre p1 fill-light mt0'>_addBaselineStyles()</div>
-  
-  
-
-  
-  
-  
-  
-  
-  
-
-  
-
-  
-
   
 
   

@@ -5,7 +5,7 @@ import { normalizeBattingStats, normalizePitchingStats, type NormalizedBatter, t
 import { buildRoster } from './core/rosterBuilder.js';
 import { prepareMatchups, type Roster } from './core/matchupPreparer.js';
 import { initGameState, simulateAtBat, attemptSteal, attemptPickoff, type GameState } from './core/gameEngine.js';
-import { checkWalkoff, checkGameEnd as pureCheckGameEnd } from './core/gameEndLogic.js';
+import { checkGameEnd } from './core/gameEndLogic.js';
 
 // --- DOM Elements ---
 const homeSelect = document.getElementById('home-team-select') as HTMLSelectElement | null;
@@ -163,6 +163,9 @@ function renderGameState(): void {
     return;
   }
   const state = gameState; // safe after null check
+  console.log("here is the game state");
+  console.log('gameState');
+  console.log(state);
   const { inning, top, outs, bases, score, lineupIndices } = state;
   const teamIndex = top ? 0 : 1;
   const matchups = teamIndex === 0 ? awayMatchups : homeMatchups;
@@ -253,15 +256,15 @@ function startGame(): void {
 
 // --- Simulate next at-bat ---
 function handleNextAtBat(): void {
-  if (!gameState || !homeMatchups || !awayMatchups) return;
-  const state = gameState; // safe after null check
-  const teamIndex = state.top ? 0 : 1;
-  const matchups = teamIndex === 0 ? awayMatchups : homeMatchups;
-  const roster = teamIndex === 0 ? awayRoster : homeRoster;
-  if (!roster) return;
-  const batterIdx = state.lineupIndices[teamIndex] % (roster.lineup.length);
-  const batter = roster.lineup[batterIdx];
-  const result = simulateAtBat(awayMatchups, homeMatchups, state, [], []);
+  if (!gameState || !homeMatchups || !awayMatchups) return
+  const state = gameState
+
+  const teamIndex = state.top ? 0 : 1
+  const roster = teamIndex === 0 ? awayRoster : homeRoster
+  if (!roster) return
+  const batterIdx = state.lineupIndices[teamIndex] % roster.lineup.length
+  const batter = roster.lineup[batterIdx]
+  const result = simulateAtBat(awayMatchups, homeMatchups, state, [], [])
 
   // Always log the at-bat result first (before transition)
   renderAtBatResult({
@@ -272,81 +275,65 @@ function handleNextAtBat(): void {
     bases: [...state.bases],
     inning: state.inning,
     top: state.top
-  });
+  })
 
-  // Track runs scored this half-inning
-  type GameStateWithExtras = Omit<typeof state, 'score'> & {
-    score: [number, number];
-    _halfInningStartScore: [number, number];
-    isHalfInningOver: boolean;
-    runsScoredThisHalf: number;
-  };
-  const stateAny = state as GameStateWithExtras;
+  // Check for immediate game end (e.g. walk-off or pre-half-end win)
+  const gameEnded = checkGameEnd({
+    inning: state.inning,
+    top: state.top,
+    score: state.score as [number, number],
+    outs: state.outs
+  }, endGame)
 
-  // Ensure _halfInningStartScore is initialized for the first half-inning
-  if (!stateAny._halfInningStartScore) {
-    stateAny._halfInningStartScore = [...state.score] as [number, number];
+  if (gameEnded) {
+    renderGameStateWithButtons()
+    return
   }
 
-  // --- Walk-off logic: If home team takes the lead in the bottom of the 9th or later, end game immediately ---
-  if (checkWalkoff(stateAny, endGame)) {
-    renderGameStateWithButtons();
-    return;
-  }
-
-  let transitionMsg = '';
-  let isNewHalfInning = false;
-  let justEndedTopHalf = false;
-  let justEndedBottomHalf = false;
   // Handle inning/half-inning transitions
+  let transitionMsg = ''
+  let isNewHalfInning = false
   if (state.outs >= 3) {
-    state.outs = 0;
-    state.bases = [0, 0, 0];
-    // Calculate runs scored this half-inning
-    const runsScoredThisHalf = (state.top ? state.score[0] - stateAny._halfInningStartScore[0] : state.score[1] - stateAny._halfInningStartScore[1]);
+    state.bases = [0, 0, 0]
+    state.outs = 0
     if (state.top) {
-      state.top = false; // Switch to bottom
-      transitionMsg = 'End of top half. Switching to bottom of inning.';
-      isNewHalfInning = true;
-      justEndedTopHalf = true;
+      state.top = false // Switch to bottom half
+      transitionMsg = 'End of top half. Switching to bottom of inning.'
     } else {
-      state.top = true; // Switch to top of next inning
-      state.inning++;
-      transitionMsg = 'End of inning. Advancing to next inning.';
-      isNewHalfInning = true;
-      justEndedBottomHalf = true;
+      state.top = true  // Switch to top of next inning
+      state.inning++
+      transitionMsg = 'End of inning. Advancing to next inning.'
     }
-    // Reset half-inning start score for the new half-inning
-    stateAny._halfInningStartScore = [...state.score] as [number, number];
-    // Attach isHalfInningOver and runsScoredThisHalf for game end logic
-    stateAny.isHalfInningOver = true;
-    stateAny.runsScoredThisHalf = runsScoredThisHalf;
-  } else {
-    stateAny.isHalfInningOver = false;
-    stateAny.runsScoredThisHalf = 0;
+    isNewHalfInning = true
   }
-  // If a transition occurred, log the transition message and insert the new inning/half-inning label for the next at-bat
+
+  // After transitioning, check again in case the inning ended with a lead
   if (isNewHalfInning) {
-    // Log the transition message as a divider
+    checkGameEnd({
+      inning: state.inning,
+      top: state.top,
+      score: state.score as [number, number],
+      outs: 0 // start of new half-inning
+    }, endGame)
+
     if (atbatResultContainer) {
-      const div = document.createElement('div');
-      div.innerHTML = `<em>${transitionMsg}</em>`;
-      atbatResultContainer.appendChild(div);
-      // Insert the new inning/half-inning label for the next at-bat
-      lastRenderedInning = state.inning;
-      lastRenderedTop = state.top;
-      const labelDiv = document.createElement('div');
-      labelDiv.style.marginTop = '1em';
-      labelDiv.style.fontWeight = 'bold';
-      labelDiv.textContent = `Inning ${state.inning} - ${state.top ? 'Top' : 'Bottom'}`;
-      atbatResultContainer.appendChild(labelDiv);
+      const div = document.createElement('div')
+      div.innerHTML = `<em>${transitionMsg}</em>`
+      atbatResultContainer.appendChild(div)
+
+      lastRenderedInning = state.inning
+      lastRenderedTop = state.top
+      const labelDiv = document.createElement('div')
+      labelDiv.style.marginTop = '1em'
+      labelDiv.style.fontWeight = 'bold'
+      labelDiv.textContent = `Inning ${state.inning} - ${state.top ? 'Top' : 'Bottom'}`
+      atbatResultContainer.appendChild(labelDiv)
     }
-    pureCheckGameEnd(stateAny, endGame);
-  } else {
-    pureCheckGameEnd(stateAny, endGame);
   }
-  renderGameStateWithButtons();
+
+  renderGameStateWithButtons()
 }
+
 
 // --- Load and display lineups when both teams are selected ---
 async function loadAndDisplayLineups(): Promise<void> {
