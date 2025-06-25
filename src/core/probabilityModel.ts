@@ -86,6 +86,10 @@ export interface AtBatProbabilities {
   Out: number;
 }
 
+function safeRate(rate: number | null | undefined, fallback: number): number {
+  return rate == null || isNaN(rate) || rate === 0 ? fallback : rate;
+}
+
 const LEAGUE_K_RATE = 0.22; // MLB average K/PA
 const LEAGUE_BB_RATE = 0.08; // MLB average BB/PA
 const LEAGUE_HR_RATE = 0.03; // MLB average HR/PA
@@ -101,13 +105,13 @@ export function getAtBatProbabilities(batter: NormalizedBatter, pitcher: Normali
     const pRates = pitcher.rates || {};
     const bStats = batter.stats || {};
   
-    // Clamp all input rates
-    const kRateB = clamp01(bRates.kRate ?? 0, 'batter.kRate');
-    const kRateP = clamp01(pRates.kRate ?? 0, 'pitcher.kRate');
-    const bbRateB = clamp01(bRates.bbRate ?? 0, 'batter.bbRate');
-    const bbRateP = clamp01(pRates.bbRate ?? 0, 'pitcher.bbRate');
-    const hrRateB = clamp01(bRates.hrRate ?? 0, 'batter.hrRate');
-    const hrRateP = clamp01(pRates.hrRate ?? 0, 'pitcher.hrRate');
+    // Clamp all input rates, using league average if missing or zero
+    const kRateB = clamp01(safeRate(bRates.kRate, LEAGUE_K_RATE), 'batter.kRate');
+    const kRateP = clamp01(safeRate(pRates.kRate, LEAGUE_K_RATE), 'pitcher.kRate');
+    const bbRateB = clamp01(safeRate(bRates.bbRate, LEAGUE_BB_RATE), 'batter.bbRate');
+    const bbRateP = clamp01(safeRate(pRates.bbRate, LEAGUE_BB_RATE), 'pitcher.bbRate');
+    const hrRateB = clamp01(safeRate(bRates.hrRate, LEAGUE_HR_RATE), 'batter.hrRate');
+    const hrRateP = clamp01(safeRate(pRates.hrRate, LEAGUE_HR_RATE), 'pitcher.hrRate');
     const babipB = clamp01(bRates.BABIP ?? 0.29, 'batter.BABIP');
     const babipP = clamp01(pRates.BABIP ?? 0.29, 'pitcher.BABIP');
   
