@@ -86,6 +86,10 @@ export interface AtBatProbabilities {
   Out: number;
 }
 
+const LEAGUE_K_RATE = 0.22; // MLB average K/PA
+const LEAGUE_BB_RATE = 0.08; // MLB average BB/PA
+const LEAGUE_HR_RATE = 0.03; // MLB average HR/PA
+
 /**
  * Given a normalized batter and pitcher, compute the at-bat outcome probabilities.
  * @param batter - A normalized batter object
@@ -114,9 +118,10 @@ export function getAtBatProbabilities(batter: NormalizedBatter, pitcher: Normali
     const doubles = Math.max(0, bStats.doubles ?? 0);
     const triples = Math.max(0, bStats.triples ?? 0);
   
-    const K = clamp01(avg(kRateB, kRateP), 'K');
-    const BB = clamp01(avg(bbRateB, bbRateP), 'BB');
-    const HR = clamp01(avg(hrRateB, hrRateP), 'HR');
+    // Multiplicative model for rare events
+    const K = clamp01(LEAGUE_K_RATE > 0 ? (kRateB * kRateP) / LEAGUE_K_RATE : 0, 'K');
+    const BB = clamp01(LEAGUE_BB_RATE > 0 ? (bbRateB * bbRateP) / LEAGUE_BB_RATE : 0, 'BB');
+    const HR = clamp01(LEAGUE_HR_RATE > 0 ? (hrRateB * hrRateP) / LEAGUE_HR_RATE : 0, 'HR');
     const BABIP = clamp01(avg(babipB, babipP), 'BABIP');
   
     const HBP_rate = clamp01(PA > 0 ? HBP / PA : 0, 'HBP');
