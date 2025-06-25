@@ -385,6 +385,13 @@ async function loadAndDisplayLineups(): Promise<void> {
     atBatLog = [];
     renderAllAtBatResults();
     statusDiv.textContent = 'Lineups loaded. Ready to simulate!';
+
+    // --- Debug: Dump normalized rosters for both teams ---
+    console.log('--- Home Roster (normalized, ready for engine) ---');
+    console.log(JSON.stringify(homeRoster, null, 2));
+    console.log('--- Away Roster (normalized, ready for engine) ---');
+    console.log(JSON.stringify(awayRoster, null, 2));
+
     startGame();
   } catch (err) {
     statusDiv.textContent = 'Failed to load lineups.';
