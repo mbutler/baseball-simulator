@@ -5,6 +5,7 @@ import { normalizeBattingStats, normalizePitchingStats, type NormalizedBatter, t
 import { buildRoster } from './core/rosterBuilder.js';
 import { prepareMatchups, type Roster } from './core/matchupPreparer.js';
 import { initGameState, simulateAtBat, attemptSteal, attemptPickoff, type GameState } from './core/gameEngine.js';
+import { checkWalkoff, checkGameEnd as pureCheckGameEnd } from './core/gameEndLogic.js';
 
 // --- DOM Elements ---
 const homeSelect = document.getElementById('home-team-select') as HTMLSelectElement | null;
@@ -223,34 +224,6 @@ function renderAllAtBatResults(): void {
 }
 
 // --- Game End Logic ---
-function checkGameEnd(): void {
-  if (!gameState || !nextAtBatBtn) return;
-  const { inning, top, score } = gameState;
-  // Only check for end after 9th inning or later
-  if (inning < 9) return;
-
-  // If top of 9th or later just ended (about to start bottom), and home team is ahead, game ends
-  if (!top && inning >= 9 && score[1] > score[0]) {
-    // Home team wins, no need for bottom half
-    endGame('Home', score, inning, top);
-    return;
-  }
-
-  // If bottom of 9th or later just ended (about to start top), check for winner
-  if (top && inning >= 9) {
-    if (score[0] > score[1]) {
-      // Away team wins
-      endGame('Away', score, inning, !top);
-      return;
-    } else if (score[1] > score[0]) {
-      // Home team wins (walk-off)
-      endGame('Home', score, inning, !top);
-      return;
-    }
-    // If tied, continue
-  }
-}
-
 function endGame(winner: 'Home' | 'Away', score: number[], inning: number, lastWasTop: boolean): void {
   if (nextAtBatBtn) nextAtBatBtn.disabled = true;
   if (statusDiv) {
@@ -301,24 +274,57 @@ function handleNextAtBat(): void {
     top: state.top
   });
 
+  // Track runs scored this half-inning
+  type GameStateWithExtras = Omit<typeof state, 'score'> & {
+    score: [number, number];
+    _halfInningStartScore: [number, number];
+    isHalfInningOver: boolean;
+    runsScoredThisHalf: number;
+  };
+  const stateAny = state as GameStateWithExtras;
+
+  // Ensure _halfInningStartScore is initialized for the first half-inning
+  if (!stateAny._halfInningStartScore) {
+    stateAny._halfInningStartScore = [...state.score] as [number, number];
+  }
+
+  // --- Walk-off logic: If home team takes the lead in the bottom of the 9th or later, end game immediately ---
+  if (checkWalkoff(stateAny, endGame)) {
+    renderGameStateWithButtons();
+    return;
+  }
+
   let transitionMsg = '';
   let isNewHalfInning = false;
+  let justEndedTopHalf = false;
+  let justEndedBottomHalf = false;
   // Handle inning/half-inning transitions
   if (state.outs >= 3) {
     state.outs = 0;
     state.bases = [0, 0, 0];
+    // Calculate runs scored this half-inning
+    const runsScoredThisHalf = (state.top ? state.score[0] - stateAny._halfInningStartScore[0] : state.score[1] - stateAny._halfInningStartScore[1]);
     if (state.top) {
       state.top = false; // Switch to bottom
       transitionMsg = 'End of top half. Switching to bottom of inning.';
       isNewHalfInning = true;
+      justEndedTopHalf = true;
     } else {
       state.top = true; // Switch to top of next inning
       state.inning++;
       transitionMsg = 'End of inning. Advancing to next inning.';
       isNewHalfInning = true;
+      justEndedBottomHalf = true;
     }
+    // Reset half-inning start score for the new half-inning
+    stateAny._halfInningStartScore = [...state.score] as [number, number];
+    // Attach isHalfInningOver and runsScoredThisHalf for game end logic
+    stateAny.isHalfInningOver = true;
+    stateAny.runsScoredThisHalf = runsScoredThisHalf;
+  } else {
+    stateAny.isHalfInningOver = false;
+    stateAny.runsScoredThisHalf = 0;
   }
-
   // If a transition occurred, log the transition message and insert the new inning/half-inning label for the next at-bat
   if (isNewHalfInning) {
     // Log the transition message as a divider
@@ -335,9 +341,9 @@ function handleNextAtBat(): void {
       labelDiv.textContent = `Inning ${state.inning} - ${state.top ? 'Top' : 'Bottom'}`;
       atbatResultContainer.appendChild(labelDiv);
     }
-    checkGameEnd();
+    pureCheckGameEnd(stateAny, endGame);
   } else {
-    checkGameEnd();
+    pureCheckGameEnd(stateAny, endGame);
   }
   renderGameStateWithButtons();
 }

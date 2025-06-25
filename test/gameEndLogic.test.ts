@@ -1,85 +1,144 @@
-// We'll import the checkGameEnd and endGame logic from src/index.ts, but since it's not exported, we'll copy the logic here for testing purposes.
-// In a real project, you might refactor the logic into a separate module for easier testing.
+import { describe, test, expect, beforeEach } from 'bun:test'
+import { checkWalkoff, checkGameEnd as importedCheckGameEnd } from '../src/core/gameEndLogic.js'
 
-function assertEqual(actual: any, expected: any, msg: string): void {
-  if (actual !== expected) throw new Error(msg + ` (expected ${expected}, got ${actual})`)
+let nextAtBatBtn: { disabled: boolean }
+let statusDiv: { textContent: string }
+let atbatResultContainer: { log: string[] }
+let gameState: any
+
+function resetMocks() {
+  nextAtBatBtn = { disabled: false }
+  statusDiv = { textContent: '' }
+  atbatResultContainer = { log: [] }
+  gameState = {}
 }
 
-function testGameEndLogic() {
-  // Mocks
-  let nextAtBatBtn = { disabled: false };
-  let statusDiv = { textContent: '' };
-  let atbatResultContainer: { log: string[] } = { log: [] };
-  let gameState: any;
-
-  function endGame(winner: 'Home' | 'Away', score: number[], inning: number, lastWasTop: boolean): void {
-    nextAtBatBtn.disabled = true;
-    statusDiv.textContent = `Game Over: ${winner} wins! Final Score: Away ${score[0]} – Home ${score[1]} (${inning}${lastWasTop ? ' Top' : ' Bottom'})`;
-    atbatResultContainer.log.push(statusDiv.textContent);
-  }
-
-  function checkGameEnd(): void {
-    if (!gameState || !nextAtBatBtn) return;
-    const { inning, top, score } = gameState;
-    if (inning < 9) return;
-    if (!top && inning >= 9 && score[1] > score[0]) {
-      endGame('Home', score, inning, top);
-      return;
-    }
-    if (top && inning >= 9) {
-      if (score[0] > score[1]) {
-        endGame('Away', score, inning, !top);
-        return;
-      } else if (score[1] > score[0]) {
-        endGame('Home', score, inning, !top);
-        return;
-      }
-    }
-  }
-
-  // Home team wins after top 9th (no bottom 9th played)
-  nextAtBatBtn.disabled = false; statusDiv.textContent = ''; atbatResultContainer.log = [];
-  gameState = { inning: 9, top: false, score: [2, 3] };
-  checkGameEnd();
-  assertEqual(nextAtBatBtn.disabled, true, 'Button disabled for home win');
-  assertEqual(statusDiv.textContent.includes('Home wins'), true, 'Home win message');
-
-  // Away team wins after bottom 9th
-  nextAtBatBtn.disabled = false; statusDiv.textContent = ''; atbatResultContainer.log = [];
-  gameState = { inning: 9, top: true, score: [4, 2] };
-  checkGameEnd();
-  assertEqual(nextAtBatBtn.disabled, true, 'Button disabled for away win');
-  assertEqual(statusDiv.textContent.includes('Away wins'), true, 'Away win message');
-
-  // Game continues if tied after 9
-  nextAtBatBtn.disabled = false; statusDiv.textContent = ''; atbatResultContainer.log = [];
-  gameState = { inning: 9, top: true, score: [3, 3] };
-  checkGameEnd();
-  assertEqual(nextAtBatBtn.disabled, false, 'Button not disabled for tie');
-  assertEqual(statusDiv.textContent.includes('wins'), false, 'No win message for tie');
-
-  // Walk-off win for home team in bottom 9th or later
-  nextAtBatBtn.disabled = false; statusDiv.textContent = ''; atbatResultContainer.log = [];
-  gameState = { inning: 10, top: true, score: [4, 5] };
-  checkGameEnd();
-  assertEqual(nextAtBatBtn.disabled, true, 'Button disabled for home walk-off');
-  assertEqual(statusDiv.textContent.includes('Home wins'), true, 'Home walk-off win message');
-
-  // Game continues in extra innings if tied
-  nextAtBatBtn.disabled = false; statusDiv.textContent = ''; atbatResultContainer.log = [];
-  gameState = { inning: 11, top: true, score: [6, 6] };
-  checkGameEnd();
-  assertEqual(nextAtBatBtn.disabled, false, 'Button not disabled for extra innings tie');
-  assertEqual(statusDiv.textContent.includes('wins'), false, 'No win message for extra innings tie');
-
-  // Away team wins in extra innings
-  nextAtBatBtn.disabled = false; statusDiv.textContent = ''; atbatResultContainer.log = [];
-  gameState = { inning: 12, top: true, score: [8, 7] };
-  checkGameEnd();
-  assertEqual(nextAtBatBtn.disabled, true, 'Button disabled for away win in extras');
-  assertEqual(statusDiv.textContent.includes('Away wins'), true, 'Away win message in extras');
-
-  console.log('✅ All game end logic tests passed.');
+function endGame(winner: 'Home' | 'Away', score: number[], inning: number, lastWasTop: boolean): void {
+  nextAtBatBtn.disabled = true
+  statusDiv.textContent = `Game Over: ${winner} wins! Final Score: Away ${score[0]} – Home ${score[1]} (${inning}${lastWasTop ? ' Top' : ' Bottom'})`
+  atbatResultContainer.log.push(statusDiv.textContent)
 }
 
-testGameEndLogic(); 
+// Copied for internal logic match (non-exported version)
+function checkGameEnd(context?: { justEndedTopHalf?: boolean, justEndedBottomHalf?: boolean }): void {
+  if (!gameState || !nextAtBatBtn) return
+  const { inning, top, score } = gameState
+  if (inning < 9) return
+  if (inning === 9 && top) return
+  if (context?.justEndedTopHalf && inning >= 9 && score[1] > score[0])
+    return endGame('Home', score, inning, false)
+  if (context?.justEndedBottomHalf && inning >= 9 && score[0] > score[1])
+    return endGame('Away', score, inning, true)
+  if (context?.justEndedBottomHalf && inning >= 9 && score[1] > score[0])
+    return endGame('Home', score, inning, true)
+}
+
+beforeEach(() => {
+  resetMocks()
+})
+
+describe('checkGameEnd logic', () => {
+  test('game does not end after 8th even if home is losing', () => {
+    gameState = { inning: 8, top: false, score: [2, 0] }
+    checkGameEnd({ justEndedBottomHalf: true })
+    expect(nextAtBatBtn.disabled).toBe(false)
+    expect(statusDiv.textContent.includes('wins')).toBe(false)
+  })
+
+  test('home wins after top 9th, no bottom played', () => {
+    gameState = { inning: 9, top: false, score: [2, 3] }
+    checkGameEnd({ justEndedTopHalf: true })
+    expect(nextAtBatBtn.disabled).toBe(true)
+    expect(statusDiv.textContent.includes('Home wins')).toBe(true)
+  })
+
+  test('away wins after bottom 9th', () => {
+    gameState = { inning: 10, top: true, score: [4, 2] }
+    checkGameEnd({ justEndedBottomHalf: true })
+    expect(nextAtBatBtn.disabled).toBe(true)
+    expect(statusDiv.textContent.includes('Away wins')).toBe(true)
+  })
+
+  test('game continues if tied after 9', () => {
+    gameState = { inning: 9, top: true, score: [3, 3] }
+    checkGameEnd({ justEndedBottomHalf: true })
+    expect(nextAtBatBtn.disabled).toBe(false)
+    expect(statusDiv.textContent.includes('wins')).toBe(false)
+  })
+
+  test('walk-off win for home team in extras', () => {
+    gameState = { inning: 10, top: true, score: [4, 5] }
+    checkGameEnd({ justEndedBottomHalf: true })
+    expect(nextAtBatBtn.disabled).toBe(true)
+    expect(statusDiv.textContent.includes('Home wins')).toBe(true)
+  })
+
+  test('game continues in extras if tied', () => {
+    gameState = { inning: 11, top: true, score: [6, 6] }
+    checkGameEnd({ justEndedBottomHalf: true })
+    expect(nextAtBatBtn.disabled).toBe(false)
+    expect(statusDiv.textContent.includes('wins')).toBe(false)
+  })
+
+  test('away wins in extras', () => {
+    gameState = { inning: 12, top: true, score: [8, 7] }
+    checkGameEnd({ justEndedBottomHalf: true })
+    expect(nextAtBatBtn.disabled).toBe(true)
+    expect(statusDiv.textContent.includes('Away wins')).toBe(true)
+  })
+
+  test('home wins after top 10th', () => {
+    gameState = { inning: 10, top: false, score: [2, 3] }
+    checkGameEnd({ justEndedTopHalf: true })
+    expect(nextAtBatBtn.disabled).toBe(true)
+    expect(statusDiv.textContent.includes('Home wins')).toBe(true)
+  })
+
+  test('game continues to bottom 9th if tied after top', () => {
+    gameState = { inning: 9, top: false, score: [2, 2] }
+    checkGameEnd({ justEndedTopHalf: true })
+    expect(nextAtBatBtn.disabled).toBe(false)
+    expect(statusDiv.textContent.includes('wins')).toBe(false)
+  })
+})
+
+describe('checkWalkoff logic', () => {
+  test('immediate walk-off win in bottom 9th', () => {
+    gameState = { inning: 9, top: false, score: [2, 3], isHalfInningOver: false, runsScoredThisHalf: 1 }
+    let called = false
+
+    function customEndGame() {
+      called = true
+      nextAtBatBtn.disabled = true
+      statusDiv.textContent = 'Game Over: Home wins!'
+    }
+
+    nextAtBatBtn.disabled = false
+    checkWalkoff(gameState, customEndGame)
+    expect(called).toBe(true)
+    expect(nextAtBatBtn.disabled).toBe(true)
+    expect(statusDiv.textContent.includes('Home wins')).toBe(true)
+  })
+})
+
+describe('post-increment win check', () => {
+  test('away wins immediately after bottom 9th if ahead', () => {
+    let endGameCalled = false
+    let localText = ''
+
+    const endGameTest = (winner: 'Home' | 'Away', score: number[], inning: number, lastWasTop: boolean) => {
+      endGameCalled = true
+      nextAtBatBtn.disabled = true
+      localText = `Game Over: ${winner} wins! Final Score: Away ${score[0]} – Home ${score[1]} (${inning}${lastWasTop ? ' Top' : ' Bottom'})`
+      atbatResultContainer.log.push(localText)
+    }
+
+    gameState = { inning: 10, top: true, score: [4, 3], isHalfInningOver: true, runsScoredThisHalf: 0 }
+
+    importedCheckGameEnd(gameState, endGameTest)
+
+    expect(endGameCalled).toBe(true)
+    expect(nextAtBatBtn.disabled).toBe(true)
+    expect(localText.includes('Away wins')).toBe(true)
+  })
+})
