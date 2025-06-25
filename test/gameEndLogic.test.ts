@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from 'bun:test'
-import { checkWalkoff, checkGameEnd as importedCheckGameEnd } from '../src/core/gameEndLogic.js'
+import { checkWalkoff, checkGameEnd } from '../src/core/gameEndLogic.js'
 
 let nextAtBatBtn: { disabled: boolean }
 let statusDiv: { textContent: string }
@@ -19,126 +19,158 @@ function endGame(winner: 'Home' | 'Away', score: number[], inning: number, lastW
   atbatResultContainer.log.push(statusDiv.textContent)
 }
 
-// Copied for internal logic match (non-exported version)
-function checkGameEnd(context?: { justEndedTopHalf?: boolean, justEndedBottomHalf?: boolean }): void {
-  if (!gameState || !nextAtBatBtn) return
-  const { inning, top, score } = gameState
-  if (inning < 9) return
-  if (inning === 9 && top) return
-  if (context?.justEndedTopHalf && inning >= 9 && score[1] > score[0])
-    return endGame('Home', score, inning, false)
-  if (context?.justEndedBottomHalf && inning >= 9 && score[0] > score[1])
-    return endGame('Away', score, inning, true)
-  if (context?.justEndedBottomHalf && inning >= 9 && score[1] > score[0])
-    return endGame('Home', score, inning, true)
-}
-
 beforeEach(() => {
   resetMocks()
 })
 
-describe('checkGameEnd logic', () => {
-  test('game does not end after 8th even if home is losing', () => {
-    gameState = { inning: 8, top: false, score: [2, 0] }
-    checkGameEnd({ justEndedBottomHalf: true })
+describe('checkGameEnd logic — complete innings', () => {
+  test('game continues before 9th inning regardless of score', () => {
+    gameState = { inning: 8, top: false, score: [8, 0], isHalfInningOver: true }
+    checkGameEnd(gameState, endGame)
     expect(nextAtBatBtn.disabled).toBe(false)
-    expect(statusDiv.textContent.includes('wins')).toBe(false)
   })
 
-  test('home wins after top 9th, no bottom played', () => {
-    gameState = { inning: 9, top: false, score: [2, 3] }
-    checkGameEnd({ justEndedTopHalf: true })
+  test('home wins after top 9th without playing bottom', () => {
+    gameState = { inning: 9, top: false, score: [1, 2], isHalfInningOver: true }
+    checkGameEnd(gameState, endGame)
     expect(nextAtBatBtn.disabled).toBe(true)
     expect(statusDiv.textContent.includes('Home wins')).toBe(true)
+    expect(statusDiv.textContent.includes('9 Top')).toBe(true)
   })
 
   test('away wins after bottom 9th', () => {
-    gameState = { inning: 10, top: true, score: [4, 2] }
-    checkGameEnd({ justEndedBottomHalf: true })
+    gameState = { inning: 9, top: true, score: [5, 4], isHalfInningOver: true }
+    checkGameEnd(gameState, endGame)
     expect(nextAtBatBtn.disabled).toBe(true)
     expect(statusDiv.textContent.includes('Away wins')).toBe(true)
+    expect(statusDiv.textContent.includes('9 Bottom')).toBe(true)
   })
 
-  test('game continues if tied after 9', () => {
-    gameState = { inning: 9, top: true, score: [3, 3] }
-    checkGameEnd({ justEndedBottomHalf: true })
+  test('game continues if tied after bottom 9th', () => {
+    gameState = { inning: 9, top: true, score: [3, 3], isHalfInningOver: true }
+    checkGameEnd(gameState, endGame)
     expect(nextAtBatBtn.disabled).toBe(false)
-    expect(statusDiv.textContent.includes('wins')).toBe(false)
   })
 
-  test('walk-off win for home team in extras', () => {
-    gameState = { inning: 10, top: true, score: [4, 5] }
-    checkGameEnd({ justEndedBottomHalf: true })
+  test('away wins in extras after bottom half', () => {
+    gameState = { inning: 10, top: true, score: [6, 5], isHalfInningOver: true }
+    checkGameEnd(gameState, endGame)
+    expect(nextAtBatBtn.disabled).toBe(true)
+    expect(statusDiv.textContent.includes('Away wins')).toBe(true)
+    expect(statusDiv.textContent.includes('10 Bottom')).toBe(true)
+  })
+
+  test('home wins after top 10th (no bottom needed)', () => {
+    gameState = { inning: 10, top: false, score: [4, 5], isHalfInningOver: true }
+    checkGameEnd(gameState, endGame)
     expect(nextAtBatBtn.disabled).toBe(true)
     expect(statusDiv.textContent.includes('Home wins')).toBe(true)
+    expect(statusDiv.textContent.includes('10 Top')).toBe(true)
   })
 
   test('game continues in extras if tied', () => {
-    gameState = { inning: 11, top: true, score: [6, 6] }
-    checkGameEnd({ justEndedBottomHalf: true })
+    gameState = { inning: 12, top: true, score: [8, 8], isHalfInningOver: true }
+    checkGameEnd(gameState, endGame)
     expect(nextAtBatBtn.disabled).toBe(false)
-    expect(statusDiv.textContent.includes('wins')).toBe(false)
   })
 
-  test('away wins in extras', () => {
-    gameState = { inning: 12, top: true, score: [8, 7] }
-    checkGameEnd({ justEndedBottomHalf: true })
-    expect(nextAtBatBtn.disabled).toBe(true)
-    expect(statusDiv.textContent.includes('Away wins')).toBe(true)
-  })
-
-  test('home wins after top 10th', () => {
-    gameState = { inning: 10, top: false, score: [2, 3] }
-    checkGameEnd({ justEndedTopHalf: true })
+  test('redundant walk-off handling — home is ahead after bottom (should still trigger win)', () => {
+    gameState = { inning: 11, top: true, score: [4, 5], isHalfInningOver: true }
+    checkGameEnd(gameState, endGame)
     expect(nextAtBatBtn.disabled).toBe(true)
     expect(statusDiv.textContent.includes('Home wins')).toBe(true)
   })
-
-  test('game continues to bottom 9th if tied after top', () => {
-    gameState = { inning: 9, top: false, score: [2, 2] }
-    checkGameEnd({ justEndedTopHalf: true })
-    expect(nextAtBatBtn.disabled).toBe(false)
-    expect(statusDiv.textContent.includes('wins')).toBe(false)
-  })
 })
 
-describe('checkWalkoff logic', () => {
-  test('immediate walk-off win in bottom 9th', () => {
-    gameState = { inning: 9, top: false, score: [2, 3], isHalfInningOver: false, runsScoredThisHalf: 1 }
-    let called = false
+describe('checkWalkoff logic — immediate win during bottom 9th or later', () => {
+  test('walk-off win in bottom 9th with single run', () => {
+    gameState = {
+      inning: 9,
+      top: false,
+      score: [3, 4],
+      runsScoredThisHalf: 1,
+      isHalfInningOver: false
+    }
 
-    function customEndGame() {
+    let called = false
+    const walkoff = checkWalkoff(gameState, () => {
       called = true
       nextAtBatBtn.disabled = true
-      statusDiv.textContent = 'Game Over: Home wins!'
-    }
+      statusDiv.textContent = 'Game Over: Home wins (walk-off)'
+    })
 
-    nextAtBatBtn.disabled = false
-    checkWalkoff(gameState, customEndGame)
     expect(called).toBe(true)
+    expect(walkoff).toBe(true)
     expect(nextAtBatBtn.disabled).toBe(true)
     expect(statusDiv.textContent.includes('Home wins')).toBe(true)
   })
-})
 
-describe('post-increment win check', () => {
-  test('away wins immediately after bottom 9th if ahead', () => {
-    let endGameCalled = false
-    let localText = ''
-
-    const endGameTest = (winner: 'Home' | 'Away', score: number[], inning: number, lastWasTop: boolean) => {
-      endGameCalled = true
-      nextAtBatBtn.disabled = true
-      localText = `Game Over: ${winner} wins! Final Score: Away ${score[0]} – Home ${score[1]} (${inning}${lastWasTop ? ' Top' : ' Bottom'})`
-      atbatResultContainer.log.push(localText)
+  test('walk-off win with multiple runs, home was trailing', () => {
+    gameState = {
+      inning: 10,
+      top: false,
+      score: [5, 7],
+      runsScoredThisHalf: 3,
+      isHalfInningOver: false
     }
 
-    gameState = { inning: 10, top: true, score: [4, 3], isHalfInningOver: true, runsScoredThisHalf: 0 }
+    let called = false
+    const walkoff = checkWalkoff(gameState, () => {
+      called = true
+      nextAtBatBtn.disabled = true
+    })
 
-    importedCheckGameEnd(gameState, endGameTest)
-
-    expect(endGameCalled).toBe(true)
+    expect(walkoff).toBe(true)
+    expect(called).toBe(true)
     expect(nextAtBatBtn.disabled).toBe(true)
-    expect(localText.includes('Away wins')).toBe(true)
+  })
+
+  test('not a walk-off: home was already ahead before bottom half', () => {
+    gameState = {
+      inning: 10,
+      top: false,
+      score: [2, 5],
+      runsScoredThisHalf: 1,
+      isHalfInningOver: false
+    }
+
+    const called = checkWalkoff(gameState, () => {
+      throw new Error('Should not call endGame for non-walk-off')
+    })
+
+    expect(called).toBe(false)
+    expect(nextAtBatBtn.disabled).toBe(false)
+  })
+
+  test('not a walk-off: game is in top half', () => {
+    gameState = {
+      inning: 10,
+      top: true,
+      score: [2, 3],
+      runsScoredThisHalf: 1,
+      isHalfInningOver: false
+    }
+
+    const called = checkWalkoff(gameState, () => {
+      throw new Error('Should not trigger walk-off in top half')
+    })
+
+    expect(called).toBe(false)
+  })
+
+  test('not a walk-off: inning before 9th', () => {
+    gameState = {
+      inning: 8,
+      top: false,
+      score: [1, 2],
+      runsScoredThisHalf: 1,
+      isHalfInningOver: false
+    }
+
+    const called = checkWalkoff(gameState, () => {
+      throw new Error('Should not trigger walk-off before 9th inning')
+    })
+
+    expect(called).toBe(false)
   })
 })

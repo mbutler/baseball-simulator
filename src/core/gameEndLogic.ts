@@ -22,9 +22,11 @@ export interface GameStateLike {
 }
 
 /**
- * Evaluates whether the game should end due to a walk-off condition.
- * This only applies in the bottom of the 9th inning or later.
- * Returns true if game ended immediately due to walk-off.
+ * Evaluates whether the game should end due to a walk-off.
+ * Should be called immediately after the home team scores a run during
+ * the bottom of the 9th inning or later.
+ *
+ * Returns true if the game ended immediately due to a walk-off.
  */
 export function checkWalkoff(
   gameState: GameStateLike,
@@ -35,49 +37,69 @@ export function checkWalkoff(
   const { inning, top, score, runsScoredThisHalf } = gameState
   const [awayScore, homeScore] = score
 
-  if (!top && inning >= 9 && runsScoredThisHalf > 0 && homeScore > awayScore) {
-    // Home team took the lead during the bottom half — walk-off
-    endGameFn('Home', score, inning, false)
+  // Walk-offs only possible in bottom 9th or later
+  if (top || inning < 9) return false
+
+  // Home team must have taken the lead *this half-inning*
+  const homeWasTiedOrBehindBeforeHalf = (homeScore - runsScoredThisHalf) <= awayScore
+  const homeIsNowAhead = homeScore > awayScore
+
+  if (homeWasTiedOrBehindBeforeHalf && homeIsNowAhead) {
+    endGameFn('Home', score, inning, false) // lastWasTop = false
     return true
   }
 
   return false
 }
 
+
 /**
- * Checks whether the game should end after a half-inning concludes.
- * Should be called after a half-inning ends (e.g., after 3 outs).
- * It accounts for regulation and extra-inning scenarios.
+ * Evaluates whether the game should end after a half-inning concludes.
+ * This should be called *only after* the 3rd out, when the half-inning has ended
+ * and the game state has transitioned to the next inning half.
+ *
+ * Assumes checkWalkoff has already been called (if relevant) during the bottom half.
  */
 export function checkGameEnd(
   gameState: GameStateLike,
   endGameFn: (winner: 'Home' | 'Away', score: number[], inning: number, lastWasTop: boolean) => void
 ): void {
-  if (!gameState || !gameState.isHalfInningOver) return;
+  if (!gameState?.isHalfInningOver) return
 
-  const { inning, top, score } = gameState;
-  const [awayScore, homeScore] = score;
+  const { inning, top, score } = gameState
+  const [awayScore, homeScore] = score
 
-  // Only evaluate end conditions starting from the 9th inning
-  if (inning < 9) return;
+  // No evaluation before 9th inning
+  if (inning < 9) return
 
-  // Never end the game at the start of the top of the 9th
-  if (inning === 9 && top) return;
-
-  // Only check for a winner at the start of a top half in extra innings
-  if (inning > 9 && top) {
+  // -- Top of 9th or later just ended (bottom half about to start)
+  if (!top) {
     if (homeScore > awayScore) {
-      endGameFn('Home', score, inning, true);
-      return;
+      // Home team is already ahead — no need for bottom half → game over
+      endGameFn('Home', score, inning, true) // lastWasTop = true
+      return
     }
-    if (awayScore > homeScore) {
-      endGameFn('Away', score, inning, true);
-      return;
-    }
-    // If tied, continue to next inning
-    return;
+    // Game continues to bottom half
+    return
   }
-  // Never end the game at the start of the bottom half of any inning 9 or later
-  // (handled by walk-off logic or after the bottom half is completed)
+
+  // -- Bottom of 9th or later just ended (top half about to start)
+  if (top) {
+    if (awayScore > homeScore) {
+      // Away team is ahead after full inning → game over
+      endGameFn('Away', score, inning, false) // lastWasTop = false
+      return
+    }
+
+    if (homeScore > awayScore) {
+      // This is defensive — should have been handled as a walk-off
+      // But if missed, enforce win now
+      endGameFn('Home', score, inning, false)
+      return
+    }
+
+    // Tie → continue to next inning
+  }
 }
+
 
