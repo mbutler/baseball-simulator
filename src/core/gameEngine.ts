@@ -163,18 +163,19 @@ export function simulateAtBat(
     state.pitcherFatigue[1 - teamIndex].battersFaced++;
     const fatigue = state.pitcherFatigue[1 - teamIndex].battersFaced;
     if (fatigue > 18) { // After 2 times through the order
-      // Adjust probabilities: increase BB/H, decrease K/Out
-      const factor = Math.min((fatigue - 18) * 0.02, 0.2); // up to 20% adjustment
+      // Revised: Smaller adjustment, only BB/1B up, Out down, Out never < 50% original
+      const maxFactor = 0.05; // 5% max adjustment
+      const factor = Math.min((fatigue - 18) * 0.005, maxFactor); // +0.5% per batter over 18
       probabilities = { ...probabilities };
+      const origOut = probabilities['Out'];
       if (probabilities['BB']) probabilities['BB'] += factor;
-      if (probabilities['HBP']) probabilities['HBP'] += factor / 2;
       if (probabilities['1B']) probabilities['1B'] += factor;
-      if (probabilities['2B']) probabilities['2B'] += factor / 2;
-      if (probabilities['3B']) probabilities['3B'] += factor / 4;
-      if (probabilities['HR']) probabilities['HR'] += factor / 4;
-      if (probabilities['K']) probabilities['K'] -= factor;
-      if (probabilities['Out']) probabilities['Out'] -= factor;
-      // Normalize so total = 1
+      if (probabilities['Out']) {
+        probabilities['Out'] -= factor;
+        // Never let Out fall below 50% of original
+        if (probabilities['Out'] < 0.5 * origOut) probabilities['Out'] = 0.5 * origOut;
+      }
+      // Renormalize so total = 1
       const total = Object.values(probabilities).reduce((a, b) => a + b, 0);
       Object.keys(probabilities).forEach(k => probabilities[k as keyof typeof probabilities] = Math.max(0, probabilities[k as keyof typeof probabilities] / total));
     }

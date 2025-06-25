@@ -222,6 +222,50 @@ function renderAllAtBatResults(): void {
   }
 }
 
+// --- Game End Logic ---
+function checkGameEnd(): void {
+  if (!gameState || !nextAtBatBtn) return;
+  const { inning, top, score } = gameState;
+  // Only check for end after 9th inning or later
+  if (inning < 9) return;
+
+  // If top of 9th or later just ended (about to start bottom), and home team is ahead, game ends
+  if (!top && inning >= 9 && score[1] > score[0]) {
+    // Home team wins, no need for bottom half
+    endGame('Home', score, inning, top);
+    return;
+  }
+
+  // If bottom of 9th or later just ended (about to start top), check for winner
+  if (top && inning >= 9) {
+    if (score[0] > score[1]) {
+      // Away team wins
+      endGame('Away', score, inning, !top);
+      return;
+    } else if (score[1] > score[0]) {
+      // Home team wins (walk-off)
+      endGame('Home', score, inning, !top);
+      return;
+    }
+    // If tied, continue
+  }
+}
+
+function endGame(winner: 'Home' | 'Away', score: number[], inning: number, lastWasTop: boolean): void {
+  if (nextAtBatBtn) nextAtBatBtn.disabled = true;
+  if (statusDiv) {
+    statusDiv.textContent = `Game Over: ${winner} wins! Final Score: Away ${score[0]} – Home ${score[1]} (${inning}${lastWasTop ? ' Top' : ' Bottom'})`;
+  }
+  if (atbatResultContainer) {
+    const div = document.createElement('div');
+    div.style.marginTop = '1em';
+    div.style.fontWeight = 'bold';
+    div.style.color = '#b00';
+    div.textContent = `Game Over: ${winner} wins! Final Score: Away ${score[0]} – Home ${score[1]} (${inning}${lastWasTop ? ' Top' : ' Bottom'})`;
+    atbatResultContainer.appendChild(div);
+  }
+}
+
 // --- Start a new game ---
 function startGame(): void {
   if (!homeRoster || !awayRoster) return;
@@ -291,6 +335,9 @@ function handleNextAtBat(): void {
       labelDiv.textContent = `Inning ${state.inning} - ${state.top ? 'Top' : 'Bottom'}`;
       atbatResultContainer.appendChild(labelDiv);
     }
+    checkGameEnd();
+  } else {
+    checkGameEnd();
   }
   renderGameStateWithButtons();
 }
