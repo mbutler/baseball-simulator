@@ -178,16 +178,6 @@
               
                 
                 <li><a
-                  href='#gamestatelike'
-                  class="">
-                  GameStateLike
-                  
-                </a>
-                
-                </li>
-              
-                
-                <li><a
                   href='#buildroster'
                   class="">
                   buildRoster
@@ -201,6 +191,16 @@
                   href='#gamestate'
                   class="">
                   GameState
+                  
+                </a>
+                
+                </li>
+              
+                
+                <li><a
+                  href='#gamestatelike'
+                  class="">
+                  GameStateLike
                   
                 </a>
                 
@@ -268,16 +268,6 @@
               
                 
                 <li><a
-                  href='#checkwalkoff'
-                  class="">
-                  checkWalkoff
-                  
-                </a>
-                
-                </li>
-              
-                
-                <li><a
                   href='#fallbackidfromname'
                   class="">
                   fallbackIdFromName
@@ -291,6 +281,16 @@
                   href='#fielder'
                   class="">
                   Fielder
+                  
+                </a>
+                
+                </li>
+              
+                
+                <li><a
+                  href='#checkgameend'
+                  class="">
+                  checkGameEnd
                   
                 </a>
                 
@@ -351,16 +351,6 @@
                   href='#initgamestate'
                   class="">
                   initGameState
-                  
-                </a>
-                
-                </li>
-              
-                
-                <li><a
-                  href='#checkgameend'
-                  class="">
-                  checkGameEnd
                   
                 </a>
                 
@@ -518,9 +508,9 @@
               
                 
                 <li><a
-                  href='#updaterosterswithnewlineups'
+                  href='#attemptpickoff'
                   class="">
-                  updateRostersWithNewLineups
+                  attemptPickoff
                   
                 </a>
                 
@@ -528,9 +518,9 @@
               
                 
                 <li><a
-                  href='#attemptpickoff'
+                  href='#updaterosterswithnewlineups'
                   class="">
-                  attemptPickoff
+                  updateRostersWithNewLineups
                   
                 </a>
                 
@@ -791,22 +781,45 @@
   </div>
   
 
-  <p>GameEndContext is no longer necessary for core logic,
-but you may retain it for UI/display purposes.</p>
+  <p>Context for game end, used for UI/display purposes only.</p>
 
     <div class='pre p1 fill-light mt0'>GameEndContext</div>
   
-  
-
-  
-  
-  
-  
+    <p>
+      Type:
+      <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object">Object</a>
+    </p>
   
   
 
   
+  
+  
+  
+  
+  
 
+  
+
+  
+    <div class='py1 quiet mt1 prose-big'>Properties</div>
+    <div>
+      
+        <div class='space-bottom0'>
+          <span class='code bold'>justEndedTopHalf</span> <code class='quiet'>(<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>?)</code>
+          : True if the top half of the inning just ended.
+
+          
+        </div>
+      
+        <div class='space-bottom0'>
+          <span class='code bold'>justEndedBottomHalf</span> <code class='quiet'>(<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>?)</code>
+          : True if the bottom half of the inning just ended.
+
+          
+        </div>
+      
+    </div>
   
 
   
@@ -1488,56 +1501,6 @@ Designed to be used server-side (e.g. in Bun) to avoid browser CORS limitations.
   
   <div class='clearfix'>
     
-    <h3 class='fl m0' id='gamestatelike'>
-      GameStateLike
-    </h3>
-    
-    
-  </div>
-  
-
-  <p>Represents the minimal state needed to determine if a game should end.</p>
-
-    <div class='pre p1 fill-light mt0'>GameStateLike</div>
-  
-  
-
-  
-  
-  
-  
-  
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-</section>
-
-          
-        
-          
-          <section class='p2 mb2 clearfix bg-white minishadow'>
-
-  
-  <div class='clearfix'>
-    
     <h3 class='fl m0' id='buildroster'>
       buildRoster
     </h3>
@@ -1721,6 +1684,94 @@ Designed to be used server-side (e.g. in Bun) to avoid browser CORS limitations.
         <div class='space-bottom0'>
           <span class='code bold'>pitcherFatigue</span> <code class='quiet'>(<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array">Array</a>&#x3C;{battersFaced: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>}>)</code>
           : Array tracking batters faced for each pitcher ([away, home])
+
+          
+        </div>
+      
+    </div>
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+</section>
+
+          
+        
+          
+          <section class='p2 mb2 clearfix bg-white minishadow'>
+
+  
+  <div class='clearfix'>
+    
+    <h3 class='fl m0' id='gamestatelike'>
+      GameStateLike
+    </h3>
+    
+    
+  </div>
+  
+
+  <p>Represents the minimal state needed to determine if a game should end.</p>
+
+    <div class='pre p1 fill-light mt0'>GameStateLike</div>
+  
+    <p>
+      Type:
+      <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object">Object</a>
+    </p>
+  
+  
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  
+    <div class='py1 quiet mt1 prose-big'>Properties</div>
+    <div>
+      
+        <div class='space-bottom0'>
+          <span class='code bold'>inning</span> <code class='quiet'>(<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>)</code>
+          : 1-based inning number (starts at 1)
+
+          
+        </div>
+      
+        <div class='space-bottom0'>
+          <span class='code bold'>top</span> <code class='quiet'>(<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>)</code>
+          : True if top half of inning, false if bottom half
+
+          
+        </div>
+      
+        <div class='space-bottom0'>
+          <span class='code bold'>score</span> <code class='quiet'>([<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>])</code>
+          : [Away, Home] score tuple
+
+          
+        </div>
+      
+        <div class='space-bottom0'>
+          <span class='code bold'>outs</span> <code class='quiet'>(<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>)</code>
+          : Number of outs (0 to 3)
 
           
         </div>
@@ -2314,85 +2365,6 @@ Designed to be used server-side (e.g. in Bun) to avoid browser CORS limitations.
   
   <div class='clearfix'>
     
-    <h3 class='fl m0' id='checkwalkoff'>
-      checkWalkoff
-    </h3>
-    
-    
-  </div>
-  
-
-  <p>Evaluates whether the game should end due to a walk-off.
-Should be called immediately after the home team scores a run during
-the bottom of the 9th inning or later.</p>
-<p>Returns true if the game ended immediately due to a walk-off.</p>
-
-    <div class='pre p1 fill-light mt0'>checkWalkoff(gameState: <a href="#gamestatelike">GameStateLike</a>, endGameFn: function (winner: <code>"Home"</code>, score: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array">Array</a>&#x3C;<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>>, inning: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, lastWasTop: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>): void): <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a></div>
-  
-  
-
-  
-  
-  
-  
-  
-  
-
-  
-    <div class='py1 quiet mt1 prose-big'>Parameters</div>
-    <div class='prose'>
-      
-        <div class='space-bottom0'>
-          <div>
-            <span class='code bold'>gameState</span> <code class='quiet'>(<a href="#gamestatelike">GameStateLike</a>)</code>
-	    
-          </div>
-          
-        </div>
-      
-        <div class='space-bottom0'>
-          <div>
-            <span class='code bold'>endGameFn</span> <code class='quiet'>(function (winner: <code>"Home"</code>, score: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Array">Array</a>&#x3C;<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>>, inning: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, lastWasTop: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>): void)</code>
-	    
-          </div>
-          
-        </div>
-      
-    </div>
-  
-
-  
-
-  
-    
-      <div class='py1 quiet mt1 prose-big'>Returns</div>
-      <code><a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a></code>
-    
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-</section>
-
-          
-        
-          
-          <section class='p2 mb2 clearfix bg-white minishadow'>
-
-  
-  <div class='clearfix'>
-    
     <h3 class='fl m0' id='fallbackidfromname'>
       fallbackIdFromName
     </h3>
@@ -2511,6 +2483,87 @@ the bottom of the 9th inning or later.</p>
     </div>
   
 
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+</section>
+
+          
+        
+          
+          <section class='p2 mb2 clearfix bg-white minishadow'>
+
+  
+  <div class='clearfix'>
+    
+    <h3 class='fl m0' id='checkgameend'>
+      checkGameEnd
+    </h3>
+    
+    
+  </div>
+  
+
+  <p>Evaluates whether the game should end after a half-inning concludes or due to a walk-off.
+Should be called after each at-bat and after the 3rd out when the half-inning has ended.</p>
+
+    <div class='pre p1 fill-light mt0'>checkGameEnd(gameState: <a href="#gamestatelike">GameStateLike</a>, endGameFn: function (winner: (<code>"Home"</code> | <code>"Away"</code>), score: [<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>], inning: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, lastWasTop: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>): void): <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a></div>
+  
+  
+
+  
+  
+  
+  
+  
+  
+
+  
+    <div class='py1 quiet mt1 prose-big'>Parameters</div>
+    <div class='prose'>
+      
+        <div class='space-bottom0'>
+          <div>
+            <span class='code bold'>gameState</span> <code class='quiet'>(<a href="#gamestatelike">GameStateLike</a>)</code>
+	    The minimal game state to evaluate for game end.
+
+          </div>
+          
+        </div>
+      
+        <div class='space-bottom0'>
+          <div>
+            <span class='code bold'>endGameFn</span> <code class='quiet'>(function (winner: (<code>"Home"</code> | <code>"Away"</code>), score: [<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>], inning: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, lastWasTop: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>): void)</code>
+	    
+          </div>
+          
+        </div>
+      
+    </div>
+  
+
+  
+
+  
+    
+      <div class='py1 quiet mt1 prose-big'>Returns</div>
+      <code><a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a></code>:
+        True if the game ended, false otherwise.
+
+      
+    
   
 
   
@@ -2923,85 +2976,6 @@ Handles cases where  contains row numbers, and name is in first .</p>
         Initial game state object
 
       
-    
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-</section>
-
-          
-        
-          
-          <section class='p2 mb2 clearfix bg-white minishadow'>
-
-  
-  <div class='clearfix'>
-    
-    <h3 class='fl m0' id='checkgameend'>
-      checkGameEnd
-    </h3>
-    
-    
-  </div>
-  
-
-  <p>Evaluates whether the game should end after a half-inning concludes.
-This should be called <em>only after</em> the 3rd out, when the half-inning has ended
-and the game state has transitioned to the next inning half.</p>
-<p>Assumes checkWalkoff has already been called (if relevant) during the bottom half.</p>
-
-    <div class='pre p1 fill-light mt0'>checkGameEnd(gameState: <a href="#gamestatelike">GameStateLike</a>, endGameFn: function (winner: (<code>"Home"</code> | <code>"Away"</code>), score: [<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>], inning: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, lastWasTop: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>): void): <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a></div>
-  
-  
-
-  
-  
-  
-  
-  
-  
-
-  
-    <div class='py1 quiet mt1 prose-big'>Parameters</div>
-    <div class='prose'>
-      
-        <div class='space-bottom0'>
-          <div>
-            <span class='code bold'>gameState</span> <code class='quiet'>(<a href="#gamestatelike">GameStateLike</a>)</code>
-	    
-          </div>
-          
-        </div>
-      
-        <div class='space-bottom0'>
-          <div>
-            <span class='code bold'>endGameFn</span> <code class='quiet'>(function (winner: (<code>"Home"</code> | <code>"Away"</code>), score: [<a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>], inning: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Number">number</a>, lastWasTop: <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>): void)</code>
-	    
-          </div>
-          
-        </div>
-      
-    </div>
-  
-
-  
-
-  
-    
-      <div class='py1 quiet mt1 prose-big'>Returns</div>
-      <code><a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a></code>
     
   
 
@@ -4366,61 +4340,6 @@ Mutates gameState.bases.</p>
   
   <div class='clearfix'>
     
-    <h3 class='fl m0' id='updaterosterswithnewlineups'>
-      updateRostersWithNewLineups
-    </h3>
-    
-    
-  </div>
-  
-
-  <p>Update rosters with new lineups without resetting game state</p>
-
-    <div class='pre p1 fill-light mt0'>updateRostersWithNewLineups(): void</div>
-  
-  
-
-  
-  
-  
-  
-  
-  
-
-  
-
-  
-
-  
-    
-      <div class='py1 quiet mt1 prose-big'>Returns</div>
-      <code>void</code>
-    
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-</section>
-
-          
-        
-          
-          <section class='p2 mb2 clearfix bg-white minishadow'>
-
-  
-  <div class='clearfix'>
-    
     <h3 class='fl m0' id='attemptpickoff'>
       attemptPickoff
     </h3>
@@ -4512,6 +4431,61 @@ Mutates gameState.bases.</p>
         Object with success status, out status, error status, and description
 
       
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+</section>
+
+          
+        
+          
+          <section class='p2 mb2 clearfix bg-white minishadow'>
+
+  
+  <div class='clearfix'>
+    
+    <h3 class='fl m0' id='updaterosterswithnewlineups'>
+      updateRostersWithNewLineups
+    </h3>
+    
+    
+  </div>
+  
+
+  <p>Update rosters with new lineups without resetting game state</p>
+
+    <div class='pre p1 fill-light mt0'>updateRostersWithNewLineups(): void</div>
+  
+  
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  
+
+  
+    
+      <div class='py1 quiet mt1 prose-big'>Returns</div>
+      <code>void</code>
     
   
 

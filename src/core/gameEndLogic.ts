@@ -1,8 +1,10 @@
 // Pure helpers for game end logic (no DOM/browser dependencies)
 
 /**
- * GameEndContext is no longer necessary for core logic, 
- * but you may retain it for UI/display purposes.
+ * Context for game end, used for UI/display purposes only.
+ * @typedef {Object} GameEndContext
+ * @property {boolean} [justEndedTopHalf] - True if the top half of the inning just ended.
+ * @property {boolean} [justEndedBottomHalf] - True if the bottom half of the inning just ended.
  */
 export interface GameEndContext {
   justEndedTopHalf?: boolean
@@ -11,6 +13,11 @@ export interface GameEndContext {
 
 /**
  * Represents the minimal state needed to determine if a game should end.
+ * @typedef {Object} GameStateLike
+ * @property {number} inning - 1-based inning number (starts at 1)
+ * @property {boolean} top - True if top half of inning, false if bottom half
+ * @property {[number, number]} score - [Away, Home] score tuple
+ * @property {number} outs - Number of outs (0 to 3)
  */
 export interface GameStateLike {
   inning: number           // 1-based inning number (starts at 1)
@@ -20,11 +27,12 @@ export interface GameStateLike {
 }
 
 /**
- * Evaluates whether the game should end after a half-inning concludes.
- * This should be called *only after* the 3rd out, when the half-inning has ended
- * and the game state has transitioned to the next inning half.
+ * Evaluates whether the game should end after a half-inning concludes or due to a walk-off.
+ * Should be called after each at-bat and after the 3rd out when the half-inning has ended.
  *
- * Assumes checkWalkoff has already been called (if relevant) during the bottom half.
+ * @param {GameStateLike} gameState - The minimal game state to evaluate for game end.
+ * @param {(winner: 'Home' | 'Away', score: [number, number], inning: number, lastWasTop: boolean) => void} endGameFn - Callback to execute if the game ends.
+ * @returns {boolean} True if the game ended, false otherwise.
  */
 export function checkGameEnd(
   gameState: GameStateLike,
