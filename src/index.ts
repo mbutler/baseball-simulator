@@ -334,6 +334,14 @@ function handleNextAtBat(): void {
   renderGameStateWithButtons()
 }
 
+function simulateFullGame(): void {
+  if (!gameState || !homeMatchups || !awayMatchups) {
+    startGame();
+  }
+  while (gameState && nextAtBatBtn && !nextAtBatBtn.disabled) {
+    handleNextAtBat();
+  }
+}
 
 // --- Load and display lineups when both teams are selected ---
 async function loadAndDisplayLineups(): Promise<void> {
@@ -698,4 +706,10 @@ if (pickoff3bBtn) pickoff3bBtn.addEventListener('click', () => {
     top: gameState.top
   });
   renderGameStateWithButtons();
-}); 
+});
+
+// Wire up the button if present
+const simulateFullGameBtn = document.getElementById('simulate-full-game-btn') as HTMLButtonElement | null;
+if (simulateFullGameBtn) {
+  simulateFullGameBtn.addEventListener('click', simulateFullGame);
+} 
