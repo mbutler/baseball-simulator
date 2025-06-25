@@ -228,7 +228,15 @@ function renderAllAtBatResults(): void {
 
 // --- Game End Logic ---
 function endGame(winner: 'Home' | 'Away', score: number[], inning: number, lastWasTop: boolean): void {
-  if (nextAtBatBtn) nextAtBatBtn.disabled = true;
+  // Disable all buttons in the sticky-action-bar
+  const stickyBar = document.querySelector('.sticky-action-bar');
+  if (stickyBar) {
+    const buttons = stickyBar.querySelectorAll('button');
+    buttons.forEach(btn => {
+      btn.disabled = true;
+      btn.classList.add('disabled-greyed');
+    });
+  }
   if (statusDiv) {
     statusDiv.textContent = `Game Over: ${winner} wins! Final Score: Away ${score[0]} – Home ${score[1]} (${inning}${lastWasTop ? ' Top' : ' Bottom'})`;
   }
