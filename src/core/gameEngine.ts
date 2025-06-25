@@ -3,8 +3,9 @@
  * @module core/gameEngine
  */
 
-import { randomWeightedChoice } from '../utils/random.js'
-import { describeOutcome } from '../utils/describeOutcome.js'
+import { randomWeightedChoice } from '../utils/random.js';
+import { describeOutcome } from '../utils/describeOutcome.js';
+import type { Matchup } from './matchupPreparer.js';
 
 /**
  * @typedef {Object} GameState
@@ -16,23 +17,39 @@ import { describeOutcome } from '../utils/describeOutcome.js'
  * @property {number[]} score - Current score ([away, home])
  * @property {{ battersFaced: number }[]} pitcherFatigue - Array tracking batters faced for each pitcher ([away, home])
  */
+export interface GameState {
+  inning: number;
+  top: boolean;
+  outs: number;
+  bases: number[];
+  lineupIndices: number[];
+  score: number[];
+  pitcherFatigue: { battersFaced: number }[];
+}
 
 /**
  * @typedef {Object} Fielder
  * @property {string} position
  * @property {Record<string, number>} stats
  */
+export interface Fielder {
+  position: string;
+  stats: Record<string, number>;
+}
 
 /**
  * @typedef {Object} PlayerWithStats
  * @property {Object.<string, number>} [stats] - Optional stats object
  */
+export interface PlayerWithStats {
+  stats?: Record<string, number>;
+}
 
 /**
  * Initialize game state for two teams.
- * @returns {GameState} Initial game state object
+ * @returns Initial game state object
  */
-export function initGameState() {
+export function initGameState(): GameState {
   return {
     inning: 1,
     top: true,
@@ -41,18 +58,18 @@ export function initGameState() {
     lineupIndices: [0, 0], // [away, home]
     score: [0, 0],         // [away, home]
     pitcherFatigue: [ { battersFaced: 0 }, { battersFaced: 0 } ] // [away, home]
-  }
+  };
 }
 
 /**
  * Returns an array of base indices (0=1B, 1=2B, 2=3B) for runners who are forced to advance.
- * @param {number[]} bases - Array of 3 numbers, representing runners on 1B, 2B, 3B (0 or 1)
- * @returns {number[]} Indices of forced runners
+ * @param bases - Array of 3 numbers, representing runners on 1B, 2B, 3B (0 or 1)
+ * @returns Indices of forced runners
  */
-function getForcedRunners(bases) {
+function getForcedRunners(bases: number[]): number[] {
   // Forced if all bases behind are occupied (including batter becoming a runner)
   // On a ground ball, batter always goes to 1B, so all runners are forced if all bases behind are occupied
-  const forced = [];
+  const forced: number[] = [];
   // If 1B is occupied, runner is forced
   if (bases[0]) forced.push(0);
   // If 2B is occupied and 1B is occupied, runner on 2B is forced
@@ -65,26 +82,26 @@ function getForcedRunners(bases) {
 /**
  * Advance runners and return number of runs scored.
  * Mutates gameState.bases.
- * @param {number[]} bases - Array of 3 numbers, representing runners on 1B, 2B, 3B (0 or 1)
- * @param {string} outcome - Outcome of the at-bat ('1B', '2B', '3B', 'HR', etc.)
- * @returns {[number[], number]} Tuple: [newBases, runsScored]
+ * @param bases - Array of 3 numbers, representing runners on 1B, 2B, 3B (0 or 1)
+ * @param outcome - Outcome of the at-bat ('1B', '2B', '3B', 'HR', etc.)
+ * @returns Tuple: [newBases, runsScored]
  */
-function advanceRunners(bases, outcome) {
-  let runs = 0
-  const newBases = [0, 0, 0]
+function advanceRunners(bases: number[], outcome: string): [number[], number] {
+  let runs = 0;
+  const newBases = [0, 0, 0];
 
   // Move existing runners
   for (let i = 2; i >= 0; i--) {
-    if (!bases[i]) continue
+    if (!bases[i]) continue;
     const destination = i + (
       outcome === '1B' ? 1 :
       outcome === '2B' ? 2 :
       outcome === '3B' ? 3 :
       4
-    )
+    );
 
-    if (destination >= 3) runs++
-    else newBases[destination] = 1
+    if (destination >= 3) runs++;
+    else newBases[destination] = 1;
   }
 
   // Place batter on base
@@ -95,37 +112,50 @@ function advanceRunners(bases, outcome) {
 
   // For a home run, batter also scores
   if (outcome === 'HR') {
-    runs++
+    runs++;
   }
 
-  return [newBases, runs]
+  return [newBases, runs];
+}
+
+export interface AtBatResult {
+  batter_id: string;
+  outcome: string;
+  fielder?: Fielder;
+  fielderPosition?: string;
 }
 
 /**
  * Simulates a single at-bat and updates the game state.
  *
- * @param {import('./matchupPreparer.js').Matchup[]} awayMatchups - Array of matchup objects for the away team
- * @param {import('./matchupPreparer.js').Matchup[]} homeMatchups - Array of matchup objects for the home team
- * @param {GameState} state - The current game state (mutated in place)
- * @param {Fielder[]} awayFielders - Array of normalized fielders for the away team
- * @param {Fielder[]} homeFielders - Array of normalized fielders for the home team
- * @param {function(Object): string} [randomFn] - Optional: function to pick outcome, defaults to randomWeightedChoice
- * @param {function(string): string} [describeFn] - Optional: function to describe outcome, defaults to describeOutcome
- * @returns {{ batter_id: string, outcome: string, fielder?: Fielder, fielderPosition?: string }} Object with batter_id, outcome description, and (if applicable) fielder info
+ * @param awayMatchups - Array of matchup objects for the away team
+ * @param homeMatchups - Array of matchup objects for the home team
+ * @param state - The current game state (mutated in place)
+ * @param awayFielders - Array of normalized fielders for the away team
+ * @param homeFielders - Array of normalized fielders for the home team
+ * @param randomFn - Optional: function to pick outcome, defaults to randomWeightedChoice
+ * @param describeFn - Optional: function to describe outcome, defaults to describeOutcome
+ * @returns Object with batter_id, outcome description, and (if applicable) fielder info
  */
-export function simulateAtBat(awayMatchups, homeMatchups, state, awayFielders, homeFielders, randomFn, describeFn) {
-  const _randomWeightedChoice = randomFn || randomWeightedChoice
-  const _describeOutcome = describeFn || describeOutcome
-  const teamIndex = state.top ? 0 : 1
-  /** @type {import('./matchupPreparer.js').Matchup[]} */
-  const lineup = teamIndex === 0 ? awayMatchups : homeMatchups
-  /** @type {Fielder[]} */
-  let fielders = teamIndex === 0 ? homeFielders : awayFielders // fielding team
+export function simulateAtBat(
+  awayMatchups: Matchup[], 
+  homeMatchups: Matchup[], 
+  state: GameState, 
+  awayFielders: Fielder[], 
+  homeFielders: Fielder[], 
+  randomFn?: (weights: Record<string, number>) => string,
+  describeFn?: (outcome: string) => string
+): AtBatResult {
+  const _randomWeightedChoice = randomFn || randomWeightedChoice;
+  const _describeOutcome = describeFn || describeOutcome;
+  const teamIndex = state.top ? 0 : 1;
+  const lineup = teamIndex === 0 ? awayMatchups : homeMatchups;
+  let fielders = teamIndex === 0 ? homeFielders : awayFielders; // fielding team
   // Defensive: ensure fielders is always an array
   const safeFielders = Array.isArray(fielders) ? fielders : [];
-  const batterIndex = state.lineupIndices[teamIndex]
-  const matchup = lineup[batterIndex % lineup.length]
-  let probabilities = /** @type {Record<string, number>} */ (matchup.probabilities)
+  const batterIndex = state.lineupIndices[teamIndex];
+  const matchup = lineup[batterIndex % lineup.length];
+  let probabilities = matchup.probabilities;
 
   // --- Pitcher Fatigue Logic ---
   if (state.pitcherFatigue && state.pitcherFatigue[1 - teamIndex]) {
@@ -146,42 +176,42 @@ export function simulateAtBat(awayMatchups, homeMatchups, state, awayFielders, h
       if (probabilities['Out']) probabilities['Out'] -= factor;
       // Normalize so total = 1
       const total = Object.values(probabilities).reduce((a, b) => a + b, 0);
-      Object.keys(probabilities).forEach(k => probabilities[k] = Math.max(0, probabilities[k] / total));
+      Object.keys(probabilities).forEach(k => probabilities[k as keyof typeof probabilities] = Math.max(0, probabilities[k as keyof typeof probabilities] / total));
     }
   }
 
-  const outcome = _randomWeightedChoice(probabilities)
-  const descriptiveOutcome = _describeOutcome(outcome)
+  const outcome = _randomWeightedChoice(probabilities);
+  const descriptiveOutcome = _describeOutcome(outcome);
 
-  state.lineupIndices[teamIndex]++
+  state.lineupIndices[teamIndex]++;
 
-  let fielder = undefined
-  let fielderPosition = ''
-  let errorOccurred = false
+  let fielder: Fielder | undefined = undefined;
+  let fielderPosition = '';
+  let errorOccurred = false;
   let doublePlayOccurred = false;
   let triplePlayOccurred = false;
 
   // If ball in play (not K, BB, HBP, HR), try to extract fielder position from description
   if (outcome === 'Out') {
     // e.g., "Groundout to SS"
-    const match = descriptiveOutcome.match(/to ([A-Z0-9]+)/)
+    const match = descriptiveOutcome.match(/to ([A-Z0-9]+)/);
     if (match) {
-      fielderPosition = match[1]
-      fielder = safeFielders.find(f => f.position === fielderPosition)
+      fielderPosition = match[1];
+      fielder = safeFielders.find(f => f.position === fielderPosition);
       // Error probability logic
       if (fielder && fielder.stats) {
-        const E = Number(fielder.stats['E']) || 0
-        const PO = Number(fielder.stats['PO']) || 0
-        const A = Number(fielder.stats['A']) || 0
-        const chances = PO + A + E
-        const errorProb = chances > 0 ? E / chances : 0.01 // fallback to 1% if no data
+        const E = Number(fielder.stats['E']) || 0;
+        const PO = Number(fielder.stats['PO']) || 0;
+        const A = Number(fielder.stats['A']) || 0;
+        const chances = PO + A + E;
+        const errorProb = chances > 0 ? E / chances : 0.01; // fallback to 1% if no data
         if (Math.random() < errorProb) {
-          errorOccurred = true
+          errorOccurred = true;
         }
       } else {
         // No stats, fallback to 1% error chance
         if (Math.random() < 0.01) {
-          errorOccurred = true
+          errorOccurred = true;
         }
       }
     }
@@ -190,15 +220,15 @@ export function simulateAtBat(awayMatchups, homeMatchups, state, awayFielders, h
   // --- Error logic takes precedence over double/triple play logic ---
   if (errorOccurred) {
     // Treat as error: advance runners as on a single, do not increment outs
-    const [newBases, runs] = advanceRunners(state.bases, '1B')
-    state.bases = newBases
-    state.score[teamIndex] += runs
+    const [newBases, runs] = advanceRunners(state.bases, '1B');
+    state.bases = newBases;
+    state.score[teamIndex] += runs;
     return {
       batter_id: matchup.batter_id,
       outcome: `Error on ${fielderPosition}`,
       fielder,
       fielderPosition
-    }
+    };
   }
 
   // --- Triple Play Logic ---
@@ -286,36 +316,50 @@ export function simulateAtBat(awayMatchups, homeMatchups, state, awayFielders, h
   }
 
   if (outcome === 'Out' || outcome === 'K') {
-    state.outs++
+    state.outs++;
   } else if (outcome === 'BB' || outcome === 'HBP') {
-    const [newBases, runs] = advanceRunners(state.bases, '1B')
-    state.bases = newBases
-    state.score[teamIndex] += runs
+    const [newBases, runs] = advanceRunners(state.bases, '1B');
+    state.bases = newBases;
+    state.score[teamIndex] += runs;
   } else {
-    const [newBases, runs] = advanceRunners(state.bases, outcome)
-    state.bases = newBases
-    state.score[teamIndex] += runs
+    const [newBases, runs] = advanceRunners(state.bases, outcome);
+    state.bases = newBases;
+    state.score[teamIndex] += runs;
   }
 
   return {
     batter_id: matchup.batter_id,
     outcome: descriptiveOutcome,
     ...(fielder ? { fielder, fielderPosition } : {})
-  }
+  };
+}
+
+export interface StealResult {
+  success: boolean;
+  out: boolean;
+  description: string;
 }
 
 /**
  * Attempt to steal a base.
- * @param {number} base - The base to steal (2 for 2B, 3 for 3B, 4 for home)
- * @param {GameState} state - The current game state (mutated in place)
- * @param {PlayerWithStats} runner - The runner object (should have .stats if available)
- * @param {PlayerWithStats} pitcher - The pitcher object (should have .stats if available)
- * @param {PlayerWithStats} catcher - The catcher object (should have .stats if available)
- * @param {number} fromBase - The base the runner is currently on (1 for 1B, 2 for 2B, 3 for 3B)
- * @param {function(number): number} [randomFn] - Optional random function, should be called as rand(1) to get [0,1)
- * @returns {{ success: boolean, out: boolean, description: string }}
+ * @param base - The base to steal (2 for 2B, 3 for 3B, 4 for home)
+ * @param state - The current game state (mutated in place)
+ * @param runner - The runner object (should have .stats if available)
+ * @param pitcher - The pitcher object (should have .stats if available)
+ * @param catcher - The catcher object (should have .stats if available)
+ * @param fromBase - The base the runner is currently on (1 for 1B, 2 for 2B, 3 for 3B)
+ * @param randomFn - Optional random function, should be called as rand(1) to get [0,1)
+ * @returns Object with success status, out status, and description
  */
-export function attemptSteal(base, state, runner, pitcher, catcher, fromBase, randomFn) {
+export function attemptSteal(
+  base: number, 
+  state: GameState, 
+  runner: PlayerWithStats, 
+  pitcher: PlayerWithStats, 
+  catcher: PlayerWithStats, 
+  fromBase: number, 
+  randomFn?: (max: number) => number
+): StealResult {
   const rand = randomFn || Math.random;
   // Check runner is present on fromBase
   if (!state.bases[fromBase - 1]) {
@@ -368,17 +412,31 @@ export function attemptSteal(base, state, runner, pitcher, catcher, fromBase, ra
   }
 }
 
+export interface PickoffResult {
+  success: boolean;
+  out: boolean;
+  error: boolean;
+  description: string;
+}
+
 /**
  * Attempt a pickoff at a base.
- * @param {number} base - The base to pick off (1, 2, or 3)
- * @param {GameState} state - The current game state (mutated in place)
- * @param {PlayerWithStats} runner - The runner object (should have .stats if available)
- * @param {PlayerWithStats} pitcher - The pitcher object (should have .stats if available)
- * @param {PlayerWithStats} fielder - The fielder covering the base (should have .stats if available)
- * @param {function(number): number} [randomFn] - Optional random function, should be called as rand(1) to get [0,1)
- * @returns {{ success: boolean, out: boolean, error: boolean, description: string }}
+ * @param base - The base to pick off (1, 2, or 3)
+ * @param state - The current game state (mutated in place)
+ * @param runner - The runner object (should have .stats if available)
+ * @param pitcher - The pitcher object (should have .stats if available)
+ * @param fielder - The fielder covering the base (should have .stats if available)
+ * @param randomFn - Optional random function, should be called as rand(1) to get [0,1)
+ * @returns Object with success status, out status, error status, and description
  */
-export function attemptPickoff(base, state, runner, pitcher, fielder, randomFn) {
+export function attemptPickoff(
+  base: number, 
+  state: GameState, 
+  runner: PlayerWithStats, 
+  pitcher: PlayerWithStats, 
+  fielder: PlayerWithStats, 
+  randomFn?: (max: number) => number
+): PickoffResult {
   const rand = randomFn || Math.random;
   // Check runner is present on base
   if (!state.bases[base - 1]) {
@@ -441,4 +499,4 @@ export function attemptPickoff(base, state, runner, pitcher, fielder, randomFn) 
       description: `Pickoff attempt at base ${base} unsuccessful`
     };
   }
-}
+} 

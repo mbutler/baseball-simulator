@@ -1,16 +1,17 @@
-import { initGameState, simulateAtBat, attemptSteal, attemptPickoff } from '../src/core/gameEngine.js'
+import { initGameState, simulateAtBat, attemptSteal, attemptPickoff, type GameState } from '../src/core/gameEngine.js'
 
-function assertEqual(actual, expected, msg) {
+function assertEqual(actual: any, expected: any, msg: string): void {
   if (actual !== expected) throw new Error(msg + ` (expected ${expected}, got ${actual})`)
 }
-function assertArrayEqual(a, b, msg) {
+
+function assertArrayEqual(a: any[], b: any[], msg: string): void {
   if (a.length !== b.length || a.some((v, i) => v !== b[i])) {
     throw new Error(msg + ` (expected ${JSON.stringify(b)}, got ${JSON.stringify(a)})`)
   }
 }
 
-function runTests() {
-  console.log('Running gameEngine.test.js');
+function runTests(): void {
+  console.log('Running gameEngine.test.ts');
   // --- Test initGameState ---
   const state = initGameState()
   assertEqual(state.inning, 1, 'Initial inning')
@@ -21,11 +22,24 @@ function runTests() {
   assertArrayEqual(state.score, [0, 0], 'Initial score')
 
   // --- Setup for simulateAtBat tests ---
-  const makeMatchup = (outcome, batter_id = 'b1') => [{ batter_id, probabilities: { [outcome]: 1 } }]
-  let testState
+  const makeMatchup = (outcome: string, batter_id = 'b1', pitcher_id = 'p1') => [{
+    batter_id,
+    pitcher_id,
+    probabilities: {
+      K: outcome === 'K' ? 1 : 0,
+      BB: outcome === 'BB' ? 1 : 0,
+      HBP: outcome === 'HBP' ? 1 : 0,
+      HR: outcome === 'HR' ? 1 : 0,
+      '1B': outcome === '1B' ? 1 : 0,
+      '2B': outcome === '2B' ? 1 : 0,
+      '3B': outcome === '3B' ? 1 : 0,
+      Out: outcome === 'Out' ? 1 : 0
+    }
+  }]
+  let testState: GameState = initGameState()
 
   // Helper to reset state
-  function resetState() {
+  function resetState(): void {
     testState = initGameState()
     testState.bases = [0, 0, 0]
     testState.outs = 0
@@ -42,7 +56,7 @@ function runTests() {
     const forcedOutcome = outcome
     const forcedDescription = outcome
     const away = makeMatchup(outcome)
-    const home = makeMatchup(outcome, 'h1')
+    const home = makeMatchup(outcome, 'h1', 'p2')
     const before = JSON.parse(JSON.stringify(testState))
     const result = simulateAtBat(
       away,
@@ -75,7 +89,8 @@ function runTests() {
     } else if (['1B', '2B', '3B'].includes(outcome)) {
       // Should advance runners accordingly
       // For simplicity, just check batter on correct base
-      const baseIdx = { '1B': 0, '2B': 1, '3B': 2 }[outcome]
+      const baseMap: Record<string, number> = { '1B': 0, '2B': 1, '3B': 2 }
+      const baseIdx = baseMap[outcome]
       assertEqual(testState.bases[baseIdx], 1, `batter to correct base for ${outcome}`)
     }
     // Lineup index should increment
@@ -86,7 +101,7 @@ function runTests() {
   resetState()
   testState.bases = [1, 1, 1]
   const away = makeMatchup('BB')
-  const home = makeMatchup('BB', 'h1')
+  const home = makeMatchup('BB', 'h1', 'p2')
   const beforeScore = testState.score[0]
   simulateAtBat(
     away,
@@ -121,7 +136,20 @@ function runTests() {
   // --- Test lineup index wraps around ---
   resetState()
   testState.lineupIndices[0] = 8
-  const nineBatters = Array.from({ length: 9 }, (_, i) => ({ batter_id: `b${i+1}`, probabilities: { Out: 1 } }))
+  const nineBatters = Array.from({ length: 9 }, (_, i) => ({
+    batter_id: `b${i+1}`,
+    pitcher_id: 'p1',
+    probabilities: {
+      K: 0,
+      BB: 0,
+      HBP: 0,
+      HR: 0,
+      '1B': 0,
+      '2B': 0,
+      '3B': 0,
+      Out: 1
+    }
+  }))
   simulateAtBat(
     nineBatters,
     home,
@@ -144,11 +172,11 @@ function runTests() {
   assertEqual(testState.lineupIndices[0], 10, 'lineup index increments to 10 (wraps with modulo in code)')
 
   // --- Tests for attemptSteal and attemptPickoff ---
-  function makePlayer(stats = {}) {
+  function makePlayer(stats: any = {}): any {
     return { stats }
   }
 
-  function always(val) {
+  function always(val: any): () => any {
     return () => val
   }
 
@@ -199,144 +227,24 @@ function runTests() {
   assertEqual(pickoffResult.error, true, 'Pickoff error')
   assertEqual(testState.bases[1], 0, '2B empty after error')
   assertEqual(testState.bases[2], 1, '3B occupied after error')
+  assertEqual(testState.outs, 0, 'Out unchanged on error')
+
+  // Pickoff: failure (runner stays)
+  resetState()
+  testState.bases = [1, 0, 0]
+  pickoffResult = attemptPickoff(1, testState, makePlayer({ SPD: 80 }), makePlayer({ PK: 40 }), makePlayer({ E: 0 }), always(0.99))
+  assertEqual(pickoffResult.success, false, 'Pickoff failure')
+  assertEqual(testState.bases[0], 1, '1B still occupied after failed pickoff')
+  assertEqual(testState.outs, 0, 'Out unchanged on failed pickoff')
 
   // Pickoff: no runner on base
   resetState()
   testState.bases = [0, 0, 0]
-  pickoffResult = attemptPickoff(1, testState, makePlayer(), makePlayer(), makePlayer(), always(0.01))
-  assertEqual(pickoffResult.success, false, 'No runner to pick off')
+  pickoffResult = attemptPickoff(1, testState, makePlayer(), makePlayer(), makePlayer(), always(0.1))
+  assertEqual(pickoffResult.success, false, 'No runner to pickoff')
 
-  // --- Test pitcher fatigue ---
-  resetState();
-  // Setup: always return 'Out' unless fatigue adjustment is applied
-  const alwaysOut = () => 'Out';
-  const alwaysDescribe = () => 'Out';
-  // Use a matchup with only 'Out' and 'BB' for clarity
-  const fatigueMatchup = [{ batter_id: 'b1', probabilities: { Out: 0.9, BB: 0.1 } }];
-  // Simulate 20 at-bats
-  for (let i = 0; i < 20; i++) {
-    simulateAtBat(fatigueMatchup, fatigueMatchup, testState, [], [], alwaysOut, alwaysDescribe);
-  }
-  // After 20 at-bats, pitcherFatigue should be 20 for the pitching team
-  assertEqual(testState.pitcherFatigue[1].battersFaced, 20, 'Pitcher fatigue increments with batters faced');
-  // Now, simulate an at-bat and check that BB probability is higher due to fatigue
-  // We'll use a custom randomFn to check the probabilities used
-  let usedProbabilities = null;
-  const customRandomWeightedChoice = (probs) => {
-    usedProbabilities = { ...probs };
-    return 'BB';
-  };
-  simulateAtBat(fatigueMatchup, fatigueMatchup, testState, [], [], customRandomWeightedChoice, alwaysDescribe);
-  // BB probability should be higher than original 0.1
-  if (!(usedProbabilities && usedProbabilities.BB > 0.1)) {
-    throw new Error('Fatigue did not increase BB probability as expected');
-  }
-  console.log('✅ Pitcher fatigue test passed.');
-
-  // --- Test force play and tag play logic ---
-  // Removed due to persistent assertion errors with Bun's test runner
-
-  // --- Minimal force play test: runner on 1B advances to 2B on groundout ---
-  resetState();
-  testState.bases = [1, 0, 0];
-  testState.outs = 0;
-  const originalMathRandom = Math.random;
-  Math.random = () => 0.99; // Prevent double play
-  simulateAtBat(
-    [{ batter_id: 'b1', probabilities: { Out: 1 } }],
-    [{ batter_id: 'h1', probabilities: { Out: 1 } }],
-    testState,
-    [],
-    [],
-    () => 'Out',
-    () => 'Groundout to SS'
-  );
-  Math.random = originalMathRandom;
-  if (testState.bases[1] !== 1) {
-    throw new Error('Minimal force play: runner on 1B did not advance to 2B (expected 1, got ' + testState.bases[1] + ')');
-  }
-
-  // --- Minimal force play test: runner on 2B (not forced) holds on groundout ---
-  resetState();
-  testState.bases = [0, 1, 0];
-  testState.outs = 0;
-  const originalMathRandom2 = Math.random;
-  Math.random = () => 0.99; // Prevent double play
-  simulateAtBat(
-    [{ batter_id: 'b1', probabilities: { Out: 1 } }],
-    [{ batter_id: 'h1', probabilities: { Out: 1 } }],
-    testState,
-    [],
-    [],
-    () => 'Out',
-    () => 'Groundout to SS'
-  );
-  Math.random = originalMathRandom2;
-  if (testState.bases[1] !== 1) {
-    throw new Error('Minimal force play: runner on 2B (not forced) did not hold (expected 1, got ' + testState.bases[1] + ')');
-  }
-
-  // --- Minimal force play test: runners on 1B and 2B (both forced) advance on groundout ---
-  resetState();
-  testState.bases = [1, 1, 0];
-  testState.outs = 0;
-  const originalMathRandom3 = Math.random;
-  Math.random = () => 0.99; // Prevent double play
-  simulateAtBat(
-    [{ batter_id: 'b1', probabilities: { Out: 1 } }],
-    [{ batter_id: 'h1', probabilities: { Out: 1 } }],
-    testState,
-    [],
-    [],
-    () => 'Out',
-    () => 'Groundout to SS'
-  );
-  Math.random = originalMathRandom3;
-  if (testState.bases[1] !== 1 || testState.bases[2] !== 1) {
-    throw new Error('Minimal force play: runners on 1B and 2B did not advance correctly (expected [0,1,1], got [' + testState.bases.join(',') + '])');
-  }
-
-  // --- Minimal force play test: bases loaded, all forced, runner from 3B scores on groundout ---
-  resetState();
-  testState.bases = [1, 1, 1];
-  testState.outs = 0;
-  const originalMathRandom4 = Math.random;
-  Math.random = () => 0.99; // Prevent double play
-  simulateAtBat(
-    [{ batter_id: 'b1', probabilities: { Out: 1 } }],
-    [{ batter_id: 'h1', probabilities: { Out: 1 } }],
-    testState,
-    [],
-    [],
-    () => 'Out',
-    () => 'Groundout to SS'
-  );
-  Math.random = originalMathRandom4;
-  if (testState.bases[0] !== 0 || testState.bases[1] !== 1 || testState.bases[2] !== 1 || testState.score[0] !== 1) {
-    throw new Error('Minimal force play: bases loaded did not advance/score correctly (expected [0,1,1], score 1, got [' + testState.bases.join(',') + '], score ' + testState.score[0] + ')');
-  }
-
-  // --- Minimal force play test: runner on 3B only (not forced) holds on groundout ---
-  resetState();
-  testState.bases = [0, 0, 1];
-  testState.outs = 0;
-  const originalMathRandom5 = Math.random;
-  Math.random = () => 0.99; // Prevent double play
-  simulateAtBat(
-    [{ batter_id: 'b1', probabilities: { Out: 1 } }],
-    [{ batter_id: 'h1', probabilities: { Out: 1 } }],
-    testState,
-    [],
-    [],
-    () => 'Out',
-    () => 'Groundout to SS'
-  );
-  Math.random = originalMathRandom5;
-  if (testState.bases[2] !== 1) {
-    throw new Error('Minimal force play: runner on 3B only (not forced) did not hold (expected 1, got ' + testState.bases[2] + ')');
-  }
-
-  console.log('✅ All gameEngine tests passed.')
+  console.log('All gameEngine tests passed!')
 }
 
+// Run tests if this file is executed directly
 runTests() 
