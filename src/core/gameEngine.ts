@@ -343,7 +343,6 @@ export function simulateAtBat(
           // Move runner up one base
           state.bases[idx + 1] = state.bases[idx];
           state.bases[idx] = null;
-          console.log('Advancing forced runner from', idx, 'to', idx + 1, 'Bases:', state.bases);
         }
       }
     }
@@ -417,12 +416,11 @@ export function attemptSteal(
     // Use baserunning speed from normalized stats
     const runnerSpeed = runner.baserunning.speed || 50; // fallback to average
     const catcherArm = catcher.stats.armStrength || 50; // fallback to average
-    
-    console.log('Runner speed:', runnerSpeed, 'Catcher arm:', catcherArm);
-    
+    const runnerName = (runner as any).name || (runner as any).player_id || 'Unknown Runner';
+    const catcherName = (catcher as any).name || (catcher as any).player_id || 'Unknown Catcher';
+    console.log(`[STEAL ATTEMPT] Runner: ${runnerName} (speed: ${runnerSpeed}), Catcher: ${catcherName} (arm: ${catcherArm})`);
     // Simple model: higher speed, higher chance; higher arm, lower chance
     successProb = 0.5 + (runnerSpeed - catcherArm) / 200; // Range ~0.0-1.0
-    
     // Adjust for base difficulty
     if (base === 3) successProb -= 0.2;
     if (base === 4) successProb -= 0.4;

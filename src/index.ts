@@ -150,15 +150,32 @@ function handleNextAtBat(): void {
   let transitionMsg = ''
   let isNewHalfInning = false
   if (state.outs >= 3) {
+    // Log transition message BEFORE updating state
+    if (state.top) {
+      transitionMsg = 'End of top half. Switching to bottom of inning.'
+    } else {
+      transitionMsg = 'End of inning. Advancing to next inning.'
+    }
+    
+    // Log the transition message with the current (old) state
+    renderAtBatResult({
+      batterName: '::',
+      outcome: transitionMsg,
+      outs: state.outs,
+      score: [...state.score],
+      bases: state.bases.map(b => b ? 1 : 0), // Convert back to 0/1 for display
+      inning: state.inning,
+      top: state.top
+    }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));
+    
+    // Now update the game state
     state.bases = [null, null, null]
     state.outs = 0
     if (state.top) {
       state.top = false // Switch to bottom half
-      transitionMsg = 'End of top half. Switching to bottom of inning.'
     } else {
       state.top = true  // Switch to top of next inning
       state.inning++
-      transitionMsg = 'End of inning. Advancing to next inning.'
     }
     isNewHalfInning = true
   }
@@ -178,19 +195,6 @@ function handleNextAtBat(): void {
       );
       return
     }
-  }
-
-  // Log transition message if any
-  if (transitionMsg) {
-    renderAtBatResult({
-      batterName: 'System',
-      outcome: transitionMsg,
-      outs: state.outs,
-      score: [...state.score],
-      bases: state.bases.map(b => b ? 1 : 0), // Convert back to 0/1 for display
-      inning: state.inning,
-      top: state.top
-    }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));
   }
 
   renderGameStateWithButtons(

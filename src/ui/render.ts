@@ -51,6 +51,8 @@ export function renderGameState(
     if (nextAtBatBtn) nextAtBatBtn.style.display = 'none';
     return;
   }
+  // Always show the Next At-Bat button if a game is in progress
+  if (nextAtBatBtn) nextAtBatBtn.style.display = '';
   const state = gameState;
   const { inning, top, outs, bases, score, lineupIndices } = state;
   const teamIndex = top ? 0 : 1;
@@ -72,7 +74,6 @@ export function renderGameState(
     <div><strong>Score:</strong> Away ${score[0]} &ndash; Home ${score[1]}</div>
     <div style="margin-top:1em;"><strong>At Bat:</strong> ${batter.name} (vs ${pitcher.name})</div>
   `;
-  if (nextAtBatBtn) nextAtBatBtn.style.display = '';
 }
 
 // --- Render at-bat result ---
