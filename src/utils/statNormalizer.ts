@@ -139,6 +139,19 @@ interface RawFielder {
   f_pickoffs_catcher_only?: any;
 }
 
+// Helper to parse the primary position from the Pos string
+function parsePrimaryPosition(pos: string): string {
+  if (typeof pos !== 'string') return '';
+  // Remove asterisk and split by slash
+  const main = pos.replace('*', '').split('/')[0];
+  // Map number to position
+  const posMap: Record<string, string> = {
+    '1': 'P', '2': 'C', '3': '1B', '4': '2B', '5': '3B',
+    '6': 'SS', '7': 'LF', '8': 'CF', '9': 'RF', 'DH': 'DH'
+  };
+  return posMap[main] || main;
+}
+
 /**
  * Extracts and normalizes batting outcomes into rate-based stats for simulation use.
  * @param batters - Array of raw batter stat objects
@@ -249,6 +262,10 @@ export function normalizePitchingStats(pitchers: RawPitcher[]): NormalizedPitche
  */
 export function normalizeFieldingStats(fielders: RawFielder[]): any[] {
     return fielders.map(f => {
+      // Robustly extract position from any possible key
+      const rawPos = f.Pos || (f as any)['Position'] || (f as any)['position'] || (f as any)['POS'] || (f as any)['Primary Pos'] || '';
+      const position = parsePrimaryPosition(rawPos);
+
       // Catcher-specific stats
       const sbAllowed = Number(f.f_sb_catcher_only) || 0;
       const cs = Number(f.f_cs_catcher_only) || 0;
@@ -274,18 +291,9 @@ export function normalizeFieldingStats(fielders: RawFielder[]): any[] {
       return {
         name: f.name,
         player_id: f.player_id,
-        position: f.Pos || '',
+        position,
         stats: {
-          G: Number(f.G) || 0,
-          Inn: Number(f.Inn) || 0,
-          PO: Number(f.PO) || 0,
-          A: Number(f.A) || 0,
-          E: Number(f.E) || 0,
-          DP: Number(f.DP) || 0,
-          FP: typeof f.FP === 'string' ? Number(f.FP) : (typeof f.FP === 'number' ? f.FP : null),
-          RF: typeof f.RF === 'string' ? Number(f.RF) : (typeof f.RF === 'number' ? f.RF : null),
-          TZ: typeof f.TZ === 'string' ? Number(f.TZ) : (typeof f.TZ === 'number' ? f.TZ : null),
-          // Catcher stats
+          ...f,
           sbAllowed,
           cs,
           csPct,

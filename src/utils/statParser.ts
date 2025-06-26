@@ -47,13 +47,20 @@ function fallbackIdFromName(name: string): string {
 export function parseStatTable(table: HTMLTableElement | null): ParsedPlayer[] {
   if (!table) return [];
 
+  // Debug logs
+  console.log('Table id:', table?.id);
+  const theadRows = Array.from(table.querySelectorAll('thead tr'));
+  console.log('Header rows:', theadRows.map(tr => tr.textContent));
+  const headerRow = theadRows[theadRows.length - 1]; // Use the last header row
+  const headerCells = Array.from(headerRow.querySelectorAll('th')).map(
+    th => (th.textContent ?? '').trim()
+  );
+  console.log('Header cells:', headerCells);
+
   const rows = Array.from(table.querySelectorAll('tbody > tr')).filter(
     tr => !tr.classList.contains('thead')
   );
-
-  const headerCells = Array.from(table.querySelectorAll('thead tr th')).map(
-    th => (th.textContent ?? '').trim()
-  );
+  console.log('First data row:', rows[0]?.innerHTML);
 
   const result: ParsedPlayer[] = [];
 

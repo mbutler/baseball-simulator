@@ -95,6 +95,14 @@ async function loadTeamFile(filename: string): Promise<LoadedTeam> {
   const batters = normalizeBattingStats(battersRaw as any[]);
   const pitchers = normalizePitchingStats(pitchersRaw as any[]);
   const fielders = normalizeFieldingStats(fieldersRaw as any[]);
+
+  // Print all fielders for this team, or filter for a specific player
+  console.log(`All fieldersRaw for ${filename}:`, fieldersRaw.map(f => f.name));
+  const moreno = fieldersRaw.find(f => f.name.includes('Moreno'));
+  console.log(`${filename} Gabriel Moreno fielding raw:`, moreno);
+
+  console.log('Fielding table found:', !!fielding, fielding);
+
   return { batters, pitchers, fielders };
 }
 
