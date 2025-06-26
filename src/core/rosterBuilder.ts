@@ -3,7 +3,7 @@
  * @module core/rosterBuilder
  */
 
-import type { NormalizedBatter, NormalizedPitcher } from './probabilityModel.js';
+import type { NormalizedBatter, NormalizedPitcher } from '../types/baseball.js';
 
 /**
  * Builds a playable team roster from selected player IDs and full stat pools.

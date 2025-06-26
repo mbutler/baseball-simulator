@@ -4,7 +4,7 @@
  */
 
 import { getAtBatProbabilities } from './probabilityModel.js';
-import type { NormalizedBatter, NormalizedPitcher } from './probabilityModel.js';
+import type { NormalizedBatter, NormalizedPitcher } from '../types/baseball.js';
 
 /**
  * @typedef {Object} Roster

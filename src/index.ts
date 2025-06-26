@@ -1,7 +1,6 @@
 // Modern vanilla JS frontend for Baseball Simulator
-import { parseTables } from './utils/parseTables.js';
-import { parseStatTable, type ParsedPlayer } from './utils/statParser.js';
-import { normalizeBattingStats, normalizePitchingStats, normalizeFieldingStats, type NormalizedBatter, type NormalizedPitcher } from './utils/statNormalizer.js';
+import { loadTeamFile, getAvailableTeams, getDatasetMetadata } from './utils/dataLoader.js';
+import type { NormalizedBatter, NormalizedPitcher } from './types/baseball.js';
 import { buildRoster } from './core/rosterBuilder.js';
 import { prepareMatchups, type Roster } from './core/matchupPreparer.js';
 import { initGameState, simulateAtBat, attemptSteal, attemptPickoff, type GameState } from './core/gameEngine.js';
@@ -46,57 +45,14 @@ import {
   type AtBatLogEntry
 } from './game/state';
 
-// --- Utility: Hardcoded list of available teams ---
+// --- Utility: Get available teams from JSON dataset ---
 async function fetchAvailableTeams(): Promise<string[]> {
-  return [
-    "ARI-2025.html",
-    "ATL-2025.html",
-    "BAL-2025.html",
-    "BOS-2025.html",
-    "CHC-2025.html",
-    "CHW-2025.html",
-    "CIN-2025.html",
-    "CLE-2025.html",
-    "COL-2025.html",
-    "DET-2025.html",
-    "HOU-2025.html",
-    "KCR-2025.html",
-    "LAA-2025.html",
-    "LAD-2025.html",
-    "MIA-2025.html",
-    "MIL-2025.html",
-    "MIN-2025.html",
-    "NYM-2025.html",
-    "NYY-2025.html",
-    "OAK-2025.html",
-    "PHI-2025.html",
-    "PIT-2025.html",
-    "SDP-2025.html",
-    "SEA-2025.html",
-    "SFG-2025.html",
-    "STL-2025.html",
-    "TBR-2025.html",
-    "TEX-2025.html",
-    "TOR-2025.html",
-    "WSN-2025.html"
-  ];
-}
-
-/**
- * @param filename - Team file to load
- */
-async function loadTeamFile(filename: string): Promise<LoadedTeam> {
-  const res = await fetch(`./data/${filename}`);
-  const html = await res.text();
-  const { batting, pitching, fielding } = parseTables(html);
-  const battersRaw = batting ? parseStatTable(batting) : [];
-  const pitchersRaw = pitching ? parseStatTable(pitching) : [];
-  const fieldersRaw = fielding ? parseStatTable(fielding) : [];
-  const batters = normalizeBattingStats(battersRaw as any[]);
-  const pitchers = normalizePitchingStats(pitchersRaw as any[]);
-  const fielders = normalizeFieldingStats(fieldersRaw as any[]);
-
-  return { batters, pitchers, fielders };
+  try {
+    return await getAvailableTeams();
+  } catch (error) {
+    console.error('Error fetching available teams:', error);
+    return [];
+  }
 }
 
 // --- Helper function to find defensive player by position ---
@@ -288,7 +244,7 @@ async function loadAndDisplayLineups(): Promise<void> {
     gameStore.homeRoster = home && home.batters && home.pitchers
       ? buildRoster(
           gameStore.customHomeLineup && gameStore.customHomeLineup.length === 9 ? gameStore.customHomeLineup : mergedHomeBatters.slice(0,9).map(b=>b.player_id),
-          gameStore.customHomePitcher || home.pitchers[0].player_id,
+          gameStore.customHomePitcher || home.pitchers.find(p => p.name && p.name !== 'Player')?.player_id || home.pitchers[0].player_id,
           mergedHomeBatters,
           home.pitchers
         )
@@ -296,7 +252,7 @@ async function loadAndDisplayLineups(): Promise<void> {
     gameStore.awayRoster = away && away.batters && away.pitchers
       ? buildRoster(
           gameStore.customAwayLineup && gameStore.customAwayLineup.length === 9 ? gameStore.customAwayLineup : mergedAwayBatters.slice(0,9).map(b=>b.player_id),
-          gameStore.customAwayPitcher || away.pitchers[0].player_id,
+          gameStore.customAwayPitcher || away.pitchers.find(p => p.name && p.name !== 'Player')?.player_id || away.pitchers[0].player_id,
           mergedAwayBatters,
           away.pitchers
         )
@@ -370,7 +326,7 @@ function updateRostersWithNewLineups(): void {
   gameStore.homeRoster = gameStore.loadedHome && gameStore.loadedHome.batters && gameStore.loadedHome.pitchers
     ? buildRoster(
         gameStore.customHomeLineup && gameStore.customHomeLineup.length === 9 ? gameStore.customHomeLineup : mergedHomeBatters.slice(0,9).map(b=>b.player_id),
-        gameStore.customHomePitcher || gameStore.loadedHome.pitchers[0].player_id,
+        gameStore.customHomePitcher || gameStore.loadedHome.pitchers.find(p => p.name && p.name !== 'Player')?.player_id || gameStore.loadedHome.pitchers[0].player_id,
         mergedHomeBatters,
         gameStore.loadedHome.pitchers
       )
@@ -378,7 +334,7 @@ function updateRostersWithNewLineups(): void {
   gameStore.awayRoster = gameStore.loadedAway && gameStore.loadedAway.batters && gameStore.loadedAway.pitchers
     ? buildRoster(
         gameStore.customAwayLineup && gameStore.customAwayLineup.length === 9 ? gameStore.customAwayLineup : mergedAwayBatters.slice(0,9).map(b=>b.player_id),
-        gameStore.customAwayPitcher || gameStore.loadedAway.pitchers[0].player_id,
+        gameStore.customAwayPitcher || gameStore.loadedAway.pitchers.find(p => p.name && p.name !== 'Player')?.player_id || gameStore.loadedAway.pitchers[0].player_id,
         mergedAwayBatters,
         gameStore.loadedAway.pitchers
       )
@@ -436,7 +392,7 @@ function showLineupModal(team: 'home' | 'away', batters: NormalizedBatter[], pit
 
   // Pitcher dropdown
   pitcherSelect.innerHTML = '<option value="">-- Select --</option>' +
-    pitchers.map(p => `<option value="${p.player_id}">${p.name} (${p.stats && p.stats.IP ? p.stats.IP : ''} IP)</option>`).join('');
+    pitchers.filter(p => p.name && p.name !== 'Player' && p.name !== 'Pitcher').map(p => `<option value="${p.player_id}">${p.name} (${p.stats && p.stats.IP ? p.stats.IP : ''} IP)</option>`).join('');
   if (effectivePitcher) pitcherSelect.value = effectivePitcher;
 }
 

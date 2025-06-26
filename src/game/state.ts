@@ -1,5 +1,5 @@
 // Game state variables and state-resetting logic for Baseball Simulator
-import type { NormalizedBatter, NormalizedPitcher } from '../utils/statNormalizer';
+import type { NormalizedBatter, NormalizedPitcher } from '../types/baseball.js';
 import type { Roster } from '../core/matchupPreparer';
 import type { GameState } from '../core/gameEngine';
 

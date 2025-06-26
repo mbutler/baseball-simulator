@@ -3,6 +3,8 @@
  * @module core/probabilityModel
  */
 
+import type { NormalizedBatter, NormalizedPitcher } from '../types/baseball.js';
+
 /**
  * Computes the average of two numbers.
  * @param a - First number
@@ -11,68 +13,6 @@
  */
 function avg(a: number, b: number): number {
     return (a + b) / 2;
-}
-
-/**
- * @typedef {Object} NormalizedBatter
- * @property {string} name
- * @property {string} player_id
- * @property {number} PA
- * @property {Object} stats
- * @property {number} stats.HBP
- * @property {number} stats.singles
- * @property {number} stats.doubles
- * @property {number} stats.triples
- * @property {Object} rates
- * @property {number} rates.kRate
- * @property {number} rates.bbRate
- * @property {number} rates.hrRate
- * @property {number} rates.BABIP
- */
-export interface NormalizedBatter {
-  name: string;
-  player_id: string;
-  PA: number;
-  stats: {
-    HBP: number;
-    singles: number;
-    doubles: number;
-    triples: number;
-  };
-  rates: {
-    kRate: number | null;
-    bbRate: number | null;
-    hrRate: number | null;
-    BABIP: number | null;
-  };
-}
-
-/**
- * @typedef {Object} NormalizedPitcher
- * @property {string} name
- * @property {string} player_id
- * @property {number} TBF
- * @property {Object} stats
- * @property {number} stats.HBP
- * @property {Object} rates
- * @property {number} rates.kRate
- * @property {number} rates.bbRate
- * @property {number} rates.hrRate
- * @property {number} rates.BABIP
- */
-export interface NormalizedPitcher {
-  name: string;
-  player_id: string;
-  TBF: number;
-  stats: {
-    HBP: number;
-  };
-  rates: {
-    kRate: number | null;
-    bbRate: number | null;
-    hrRate: number | null;
-    BABIP: number | null;
-  };
 }
 
 export interface AtBatProbabilities {

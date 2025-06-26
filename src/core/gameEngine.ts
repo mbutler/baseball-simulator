@@ -6,8 +6,8 @@
 import { randomWeightedChoice } from '../utils/random.js';
 import { describeOutcome } from '../utils/describeOutcome.js';
 import type { Matchup, Roster } from './matchupPreparer.js';
-import type { NormalizedBatter as StatNormalizedBatter } from '../utils/statNormalizer.js';
-import type { NormalizedBatter } from './probabilityModel.js';
+import type { NormalizedBatter } from '../types/baseball.js';
+import type { NormalizedBatter as StatNormalizedBatter } from '../types/baseball.js';
 
 /**
  * @typedef {Object} GameState

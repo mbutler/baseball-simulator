@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "start": "bun build --minify src/index.ts --watch --outfile ./dist/js/bundle.js",
-    "docs": "documentation build src/** -f html -o docs --shallow"
+    "docs": "documentation build src/** -f html -o docs --shallow",
+    "update-dataset": "bun run src/scripts/updateDataset.ts"
   },
   "devDependencies": {
     "documentation": "^14.0.3"
