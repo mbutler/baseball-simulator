@@ -4,6 +4,24 @@ function assertEqual(actual: any, expected: any, msg: string): void {
   if (actual !== expected) throw new Error(msg + ` (expected ${expected}, got ${actual})`)
 }
 
+function makeBatter(id: string) {
+  return {
+    name: `Batter ${id}`,
+    player_id: id,
+    PA: 100,
+    stats: { H: 30, HR: 5, BB: 10, SO: 20, SF: 1, HBP: 1, singles: 20, doubles: 5, triples: 1 },
+    rates: { kRate: 0.2, bbRate: 0.1, hrRate: 0.05, BABIP: 0.3 },
+    baserunning: { runsBaserunning: 0, speed: 50 }
+  }
+}
+
+function makeRoster(id: string) {
+  return {
+    lineup: [makeBatter(id)],
+    pitcher: { name: `Pitcher ${id}`, player_id: `p${id}`, TBF: 100, stats: { IP: 50, H: 40, HR: 5, BB: 15, SO: 45, HBP: 2 }, rates: { kRate: 0.45, bbRate: 0.15, hrRate: 0.05, BABIP: 0.3 } }
+  }
+}
+
 function runTests(): void {
   console.log('Running gameEngineDefense.test.ts');
 
@@ -46,7 +64,7 @@ function runTests(): void {
     inning: 1,
     top: true,
     outs: 0,
-    bases: [0, 0, 0],
+    bases: [null, null, null],
     lineupIndices: [0, 0],
     score: [0, 0],
     pitcherFatigue: [{ battersFaced: 0 }, { battersFaced: 0 }]
@@ -62,6 +80,9 @@ function runTests(): void {
     { position: '2B', stats: { E: 0.02 } }
   ];
 
+  const awayRoster = makeRoster('b1');
+  const homeRoster = makeRoster('h1');
+
   // Test with forced outcome
   const result = simulateAtBat(
     awayMatchups,
@@ -69,6 +90,8 @@ function runTests(): void {
     gameState,
     awayFielders,
     homeFielders,
+    awayRoster,
+    homeRoster,
     () => 'Out', // Force an out
     () => 'Groundout to SS' // Force specific description
   );

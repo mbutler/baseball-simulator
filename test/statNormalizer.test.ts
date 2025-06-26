@@ -1,4 +1,4 @@
-import { normalizeBattingStats, normalizePitchingStats } from '../src/utils/statNormalizer.js'
+import { normalizeBattingStats, normalizePitchingStats, normalizeFieldingStats } from '../src/utils/statNormalizer.js'
 
 function assertEqual(actual: any, expected: any, msg: string): void {
   if (actual !== expected) throw new Error(msg + ` (expected ${expected}, got ${actual})`)
@@ -74,6 +74,54 @@ function runTests(): void {
   assertEqual(normalizedPitching[0].player_id, 'bobjohnson', 'Player ID preserved');
   assertEqual(normalizedPitching[0].stats.IP, 150, 'IP preserved');
   assertEqual(normalizedPitching[0].TBF, 600, 'TBF preserved');
+
+  // Test baserunning stats parsing
+  const batterWithBaserunning = {
+    name: 'Test Runner',
+    player_id: 'test123',
+    PA: '100',
+    AB: '90',
+    H: '30',
+    HR: '5',
+    BB: '8',
+    SO: '20',
+    SF: '1',
+    HBP: '1',
+    '2B': '8',
+    '3B': '2',
+    b_runs_baserunning: '2.5' // Positive baserunning runs = fast runner
+  };
+  
+  const normalizedBatter = normalizeBattingStats([batterWithBaserunning])[0];
+  assertEqual(normalizedBatter.baserunning.runsBaserunning, 2.5, 'baserunning runs parsed correctly');
+  assertEqual(normalizedBatter.baserunning.speed, 75, 'speed calculated correctly (50 + 2.5 * 10)');
+
+  // Test catcher fielding stats parsing
+  const catcherWithStats = {
+    name: 'Test Catcher',
+    player_id: 'catcher123',
+    Pos: 'C',
+    G: '100',
+    Inn: '900',
+    PO: '800',
+    A: '50',
+    E: '5',
+    DP: '10',
+    FP: '0.994',
+    RF: '8.5',
+    TZ: '5',
+    f_sb_catcher_only: '25',
+    f_cs_catcher_only: '15',
+    f_cs_perc_catcher_only: '37.5',
+    f_pickoffs_catcher_only: '3'
+  };
+  
+  const normalizedCatcher = normalizeFieldingStats([catcherWithStats])[0];
+  assertEqual(normalizedCatcher.stats.sbAllowed, 25, 'stolen bases allowed parsed correctly');
+  assertEqual(normalizedCatcher.stats.cs, 15, 'caught stealing parsed correctly');
+  assertEqual(normalizedCatcher.stats.csPct, 37.5, 'caught stealing percentage parsed correctly');
+  assertEqual(normalizedCatcher.stats.pickoffs, 3, 'pickoffs parsed correctly');
+  assertEqual(normalizedCatcher.stats.armStrength, 75, 'arm strength calculated correctly (50 + (37.5 - 25) * 2)');
 
   console.log('✅ All statNormalizer tests passed.');
 }

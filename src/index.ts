@@ -1,7 +1,7 @@
 // Modern vanilla JS frontend for Baseball Simulator
 import { parseTables } from './utils/parseTables.js';
 import { parseStatTable, type ParsedPlayer } from './utils/statParser.js';
-import { normalizeBattingStats, normalizePitchingStats, type NormalizedBatter, type NormalizedPitcher } from './utils/statNormalizer.js';
+import { normalizeBattingStats, normalizePitchingStats, normalizeFieldingStats, type NormalizedBatter, type NormalizedPitcher } from './utils/statNormalizer.js';
 import { buildRoster } from './core/rosterBuilder.js';
 import { prepareMatchups, type Roster } from './core/matchupPreparer.js';
 import { initGameState, simulateAtBat, attemptSteal, attemptPickoff, type GameState } from './core/gameEngine.js';
@@ -88,12 +88,28 @@ async function fetchAvailableTeams(): Promise<string[]> {
 async function loadTeamFile(filename: string): Promise<LoadedTeam> {
   const res = await fetch(`./data/${filename}`);
   const html = await res.text();
-  const { batting, pitching } = parseTables(html);
+  const { batting, pitching, fielding } = parseTables(html);
   const battersRaw = batting ? parseStatTable(batting) : [];
   const pitchersRaw = pitching ? parseStatTable(pitching) : [];
+  const fieldersRaw = fielding ? parseStatTable(fielding) : [];
   const batters = normalizeBattingStats(battersRaw as any[]);
   const pitchers = normalizePitchingStats(pitchersRaw as any[]);
-  return { batters, pitchers };
+  const fielders = normalizeFieldingStats(fieldersRaw as any[]);
+  return { batters, pitchers, fielders };
+}
+
+// --- Helper function to find defensive player by position ---
+function findDefensivePlayer(fielders: any[], position: string): any {
+  // Find the primary player at the specified position
+  const player = fielders.find(f => f.position === position);
+  if (player) return player;
+  
+  // Fallback: find any player who has played this position
+  const backup = fielders.find(f => f.positions && f.positions.includes(position));
+  if (backup) return backup;
+  
+  // Final fallback: return first player with defensive stats
+  return fielders.find(f => f.stats) || { stats: { armStrength: 50, FP: 0.985 } };
 }
 
 // --- Game End Logic ---
@@ -137,15 +153,14 @@ function startGame(): void {
 
 // --- Simulate next at-bat ---
 function handleNextAtBat(): void {
-  if (!gameStore.gameState || !gameStore.homeMatchups || !gameStore.awayMatchups) return
+  if (!gameStore.gameState || !gameStore.homeMatchups || !gameStore.awayMatchups || !gameStore.homeRoster || !gameStore.awayRoster) return
   const state = gameStore.gameState
 
   const teamIndex = state.top ? 0 : 1
   const roster = teamIndex === 0 ? gameStore.awayRoster : gameStore.homeRoster
-  if (!roster) return
   const batterIdx = state.lineupIndices[teamIndex] % roster.lineup.length
   const batter = roster.lineup[batterIdx]
-  const result = simulateAtBat(gameStore.awayMatchups, gameStore.homeMatchups, state, [], [])
+  const result = simulateAtBat(gameStore.awayMatchups, gameStore.homeMatchups, state, [], [], gameStore.awayRoster, gameStore.homeRoster)
 
   // Always log the at-bat result first (before transition)
   renderAtBatResult({
@@ -153,7 +168,7 @@ function handleNextAtBat(): void {
     outcome: result.outcome,
     outs: state.outs,
     score: [...state.score],
-    bases: [...state.bases],
+    bases: state.bases.map(b => b ? 1 : 0), // Convert back to 0/1 for display
     inning: state.inning,
     top: state.top
   }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));
@@ -178,7 +193,7 @@ function handleNextAtBat(): void {
   let transitionMsg = ''
   let isNewHalfInning = false
   if (state.outs >= 3) {
-    state.bases = [0, 0, 0]
+    state.bases = [null, null, null]
     state.outs = 0
     if (state.top) {
       state.top = false // Switch to bottom half
@@ -191,20 +206,34 @@ function handleNextAtBat(): void {
     isNewHalfInning = true
   }
 
+  // Check for game end after half-inning transition
   if (isNewHalfInning) {
-    if (atbatResultContainer) {
-      const div = document.createElement('div')
-      div.innerHTML = `<em>${transitionMsg}</em>`
-      atbatResultContainer.appendChild(div)
-
-      gameStore.lastRenderedInning = state.inning
-      gameStore.lastRenderedTop = state.top
-      const labelDiv = document.createElement('div')
-      labelDiv.style.marginTop = '1em'
-      labelDiv.style.fontWeight = 'bold'
-      labelDiv.textContent = `Inning ${state.inning} - ${state.top ? 'Top' : 'Bottom'}`
-      atbatResultContainer.appendChild(labelDiv)
+    const gameEnded = checkGameEnd({
+      inning: state.inning,
+      top: state.top,
+      score: state.score as [number, number],
+      outs: state.outs
+    }, endGame)
+    if (gameEnded) {
+      renderGameStateWithButtons(
+        () => renderGameState(gameStore.gameState, gameStore.homeRoster, gameStore.awayRoster, gameStore.homeMatchups, gameStore.awayMatchups, gameStore.lastRenderedInning, gameStore.lastRenderedTop),
+        updateBaseActionButtons
+      );
+      return
     }
+  }
+
+  // Log transition message if any
+  if (transitionMsg) {
+    renderAtBatResult({
+      batterName: 'System',
+      outcome: transitionMsg,
+      outs: state.outs,
+      score: [...state.score],
+      bases: state.bases.map(b => b ? 1 : 0), // Convert back to 0/1 for display
+      inning: state.inning,
+      top: state.top
+    }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));
   }
 
   renderGameStateWithButtons(
@@ -236,6 +265,8 @@ async function loadAndDisplayLineups(): Promise<void> {
     ]);
     gameStore.loadedHome = home;
     gameStore.loadedAway = away;
+    gameStore.homeFielders = home.fielders;
+    gameStore.awayFielders = away.fielders;
     // Use custom lineup if set, else default
     gameStore.homeRoster = home && home.batters && home.pitchers
       ? buildRoster(
@@ -469,17 +500,27 @@ if (steal2bBtn) steal2bBtn.addEventListener('click', () => {
   // Assume away team is batting if top, home if bottom
   const teamIndex = gameStore.gameState.top ? 0 : 1;
   const roster = teamIndex === 0 ? gameStore.awayRoster : gameStore.homeRoster;
-  // Find runner on 1B (first in lineup who is not at bat)
-  const runner = roster.lineup.find(b => true) || {};
-  const pitcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.pitcher;
-  const catcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.lineup[0] || {};
+  const defenseRoster = teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster;
+  const defenseFielders = teamIndex === 0 ? gameStore.homeFielders : gameStore.awayFielders;
+  
+  // Find the actual runner on 1B
+  const runner = gameStore.gameState.bases[0];
+  if (!runner) return;
+  
+  // Find the catcher from the defensive fielding data
+  const catcher = defenseFielders ? findDefensivePlayer(defenseFielders, 'C') : { stats: { armStrength: 50 } };
+  const pitcher = defenseRoster.pitcher;
+
+  console.log('UI runner object:', runner);
+  console.log('UI catcher object:', catcher);
+
   const result = attemptSteal(2, gameStore.gameState, runner, pitcher, catcher, 1);
   renderAtBatResult({
-    batterName: 'Runner',
+    batterName: runner.name,
     outcome: result.description,
     outs: gameStore.gameState.outs,
     score: [...gameStore.gameState.score],
-    bases: [...gameStore.gameState.bases],
+    bases: gameStore.gameState.bases.map(b => b ? 1 : 0), // Convert back to 0/1 for display
     inning: gameStore.gameState.inning,
     top: gameStore.gameState.top
   }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));
@@ -488,20 +529,29 @@ if (steal2bBtn) steal2bBtn.addEventListener('click', () => {
     updateBaseActionButtons
   );
 });
+
 if (steal3bBtn) steal3bBtn.addEventListener('click', () => {
   if (!gameStore.gameState || !gameStore.homeRoster || !gameStore.awayRoster) return;
   const teamIndex = gameStore.gameState.top ? 0 : 1;
   const roster = teamIndex === 0 ? gameStore.awayRoster : gameStore.homeRoster;
-  const runner = roster.lineup.find(b => true) || {};
-  const pitcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.pitcher;
-  const catcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.lineup[0] || {};
+  const defenseRoster = teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster;
+  const defenseFielders = teamIndex === 0 ? gameStore.homeFielders : gameStore.awayFielders;
+  
+  // Find the actual runner on 2B
+  const runner = gameStore.gameState.bases[1];
+  if (!runner) return;
+  
+  // Find the catcher from the defensive fielding data
+  const catcher = defenseFielders ? findDefensivePlayer(defenseFielders, 'C') : { stats: { armStrength: 50 } };
+  const pitcher = defenseRoster.pitcher;
+  
   const result = attemptSteal(3, gameStore.gameState, runner, pitcher, catcher, 2);
   renderAtBatResult({
-    batterName: 'Runner',
+    batterName: runner.name,
     outcome: result.description,
     outs: gameStore.gameState.outs,
     score: [...gameStore.gameState.score],
-    bases: [...gameStore.gameState.bases],
+    bases: gameStore.gameState.bases.map(b => b ? 1 : 0), // Convert back to 0/1 for display
     inning: gameStore.gameState.inning,
     top: gameStore.gameState.top
   }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));
@@ -510,20 +560,29 @@ if (steal3bBtn) steal3bBtn.addEventListener('click', () => {
     updateBaseActionButtons
   );
 });
+
 if (stealHomeBtn) stealHomeBtn.addEventListener('click', () => {
   if (!gameStore.gameState || !gameStore.homeRoster || !gameStore.awayRoster) return;
   const teamIndex = gameStore.gameState.top ? 0 : 1;
   const roster = teamIndex === 0 ? gameStore.awayRoster : gameStore.homeRoster;
-  const runner = roster.lineup.find(b => true) || {};
-  const pitcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.pitcher;
-  const catcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.lineup[0] || {};
+  const defenseRoster = teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster;
+  const defenseFielders = teamIndex === 0 ? gameStore.homeFielders : gameStore.awayFielders;
+  
+  // Find the actual runner on 3B
+  const runner = gameStore.gameState.bases[2];
+  if (!runner) return;
+  
+  // Find the catcher from the defensive fielding data
+  const catcher = defenseFielders ? findDefensivePlayer(defenseFielders, 'C') : { stats: { armStrength: 50 } };
+  const pitcher = defenseRoster.pitcher;
+  
   const result = attemptSteal(4, gameStore.gameState, runner, pitcher, catcher, 3);
   renderAtBatResult({
-    batterName: 'Runner',
+    batterName: runner.name,
     outcome: result.description,
     outs: gameStore.gameState.outs,
     score: [...gameStore.gameState.score],
-    bases: [...gameStore.gameState.bases],
+    bases: gameStore.gameState.bases.map(b => b ? 1 : 0), // Convert back to 0/1 for display
     inning: gameStore.gameState.inning,
     top: gameStore.gameState.top
   }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));
@@ -532,21 +591,30 @@ if (stealHomeBtn) stealHomeBtn.addEventListener('click', () => {
     updateBaseActionButtons
   );
 });
+
 // Pickoff event handlers
 if (pickoff1bBtn) pickoff1bBtn.addEventListener('click', () => {
   if (!gameStore.gameState || !gameStore.homeRoster || !gameStore.awayRoster) return;
   const teamIndex = gameStore.gameState.top ? 0 : 1;
   const roster = teamIndex === 0 ? gameStore.awayRoster : gameStore.homeRoster;
-  const runner = roster.lineup.find(b => true) || {};
-  const pitcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.pitcher;
-  const fielder = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.lineup[0] || {};
+  const defenseRoster = teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster;
+  const defenseFielders = teamIndex === 0 ? gameStore.homeFielders : gameStore.awayFielders;
+  
+  // Find the actual runner on 1B
+  const runner = gameStore.gameState.bases[0];
+  if (!runner) return;
+  
+  // Find the first baseman from the defensive fielding data
+  const fielder = defenseFielders ? findDefensivePlayer(defenseFielders, '1B') : { stats: { FP: 0.985 } };
+  const pitcher = defenseRoster.pitcher;
+  
   const result = attemptPickoff(1, gameStore.gameState, runner, pitcher, fielder);
   renderAtBatResult({
-    batterName: 'Runner',
+    batterName: runner.name,
     outcome: result.description,
     outs: gameStore.gameState.outs,
     score: [...gameStore.gameState.score],
-    bases: [...gameStore.gameState.bases],
+    bases: gameStore.gameState.bases.map(b => b ? 1 : 0), // Convert back to 0/1 for display
     inning: gameStore.gameState.inning,
     top: gameStore.gameState.top
   }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));
@@ -555,20 +623,29 @@ if (pickoff1bBtn) pickoff1bBtn.addEventListener('click', () => {
     updateBaseActionButtons
   );
 });
+
 if (pickoff2bBtn) pickoff2bBtn.addEventListener('click', () => {
   if (!gameStore.gameState || !gameStore.homeRoster || !gameStore.awayRoster) return;
   const teamIndex = gameStore.gameState.top ? 0 : 1;
   const roster = teamIndex === 0 ? gameStore.awayRoster : gameStore.homeRoster;
-  const runner = roster.lineup.find(b => true) || {};
-  const pitcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.pitcher;
-  const fielder = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.lineup[0] || {};
+  const defenseRoster = teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster;
+  const defenseFielders = teamIndex === 0 ? gameStore.homeFielders : gameStore.awayFielders;
+  
+  // Find the actual runner on 2B
+  const runner = gameStore.gameState.bases[1];
+  if (!runner) return;
+  
+  // Find the second baseman from the defensive fielding data
+  const fielder = defenseFielders ? findDefensivePlayer(defenseFielders, '2B') : { stats: { FP: 0.985 } };
+  const pitcher = defenseRoster.pitcher;
+  
   const result = attemptPickoff(2, gameStore.gameState, runner, pitcher, fielder);
   renderAtBatResult({
-    batterName: 'Runner',
+    batterName: runner.name,
     outcome: result.description,
     outs: gameStore.gameState.outs,
     score: [...gameStore.gameState.score],
-    bases: [...gameStore.gameState.bases],
+    bases: gameStore.gameState.bases.map(b => b ? 1 : 0), // Convert back to 0/1 for display
     inning: gameStore.gameState.inning,
     top: gameStore.gameState.top
   }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));
@@ -577,20 +654,29 @@ if (pickoff2bBtn) pickoff2bBtn.addEventListener('click', () => {
     updateBaseActionButtons
   );
 });
+
 if (pickoff3bBtn) pickoff3bBtn.addEventListener('click', () => {
   if (!gameStore.gameState || !gameStore.homeRoster || !gameStore.awayRoster) return;
   const teamIndex = gameStore.gameState.top ? 0 : 1;
   const roster = teamIndex === 0 ? gameStore.awayRoster : gameStore.homeRoster;
-  const runner = roster.lineup.find(b => true) || {};
-  const pitcher = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.pitcher;
-  const fielder = (teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster)!.lineup[0] || {};
+  const defenseRoster = teamIndex === 0 ? gameStore.homeRoster : gameStore.awayRoster;
+  const defenseFielders = teamIndex === 0 ? gameStore.homeFielders : gameStore.awayFielders;
+  
+  // Find the actual runner on 3B
+  const runner = gameStore.gameState.bases[2];
+  if (!runner) return;
+  
+  // Find the third baseman from the defensive fielding data
+  const fielder = defenseFielders ? findDefensivePlayer(defenseFielders, '3B') : { stats: { FP: 0.985 } };
+  const pitcher = defenseRoster.pitcher;
+  
   const result = attemptPickoff(3, gameStore.gameState, runner, pitcher, fielder);
   renderAtBatResult({
-    batterName: 'Runner',
+    batterName: runner.name,
     outcome: result.description,
     outs: gameStore.gameState.outs,
     score: [...gameStore.gameState.score],
-    bases: [...gameStore.gameState.bases],
+    bases: gameStore.gameState.bases.map(b => b ? 1 : 0), // Convert back to 0/1 for display
     inning: gameStore.gameState.inning,
     top: gameStore.gameState.top
   }, gameStore.atBatLog, () => renderAllAtBatResults(gameStore.atBatLog));

@@ -6,6 +6,7 @@ import type { GameState } from '../core/gameEngine';
 export interface LoadedTeam {
   batters: NormalizedBatter[];
   pitchers: NormalizedPitcher[];
+  fielders: any[]; // Normalized fielding data
 }
 
 export interface AtBatLogEntry {
@@ -23,6 +24,8 @@ export const gameStore = {
   loadedAway: null as LoadedTeam | null,
   homeRoster: null as Roster | null,
   awayRoster: null as Roster | null,
+  homeFielders: null as any[] | null,
+  awayFielders: null as any[] | null,
   homeMatchups: null as any[] | null,
   awayMatchups: null as any[] | null,
   gameState: null as GameState | null,
@@ -41,6 +44,8 @@ export function resetGameState() {
   gameStore.loadedAway = null;
   gameStore.homeRoster = null;
   gameStore.awayRoster = null;
+  gameStore.homeFielders = null;
+  gameStore.awayFielders = null;
   gameStore.homeMatchups = null;
   gameStore.awayMatchups = null;
   gameStore.gameState = null;

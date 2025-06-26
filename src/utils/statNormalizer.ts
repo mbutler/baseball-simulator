@@ -23,6 +23,9 @@
  * @property {number|null} rates.bbRate
  * @property {number|null} rates.hrRate
  * @property {number|null} rates.BABIP
+ * @property {Object} baserunning
+ * @property {number|null} baserunning.runsBaserunning
+ * @property {number|null} baserunning.speed
  */
 export interface NormalizedBatter {
   name: string;
@@ -44,6 +47,10 @@ export interface NormalizedBatter {
     bbRate: number | null;
     hrRate: number | null;
     BABIP: number | null;
+  };
+  baserunning: {
+    runsBaserunning: number | null;
+    speed: number | null;
   };
 }
 
@@ -98,6 +105,7 @@ interface RawBatter {
   HBP?: any;
   '2B'?: any;
   '3B'?: any;
+  b_runs_baserunning?: any;
 }
 
 interface RawPitcher {
@@ -125,6 +133,10 @@ interface RawFielder {
   FP?: any;
   RF?: any;
   TZ?: any;
+  f_sb_catcher_only?: any;
+  f_cs_catcher_only?: any;
+  f_cs_perc_catcher_only?: any;
+  f_pickoffs_catcher_only?: any;
 }
 
 /**
@@ -152,6 +164,22 @@ export function normalizeBattingStats(batters: RawBatter[]): NormalizedBatter[] 
       const kRate = PA > 0 ? SO / PA : null;
       const bbRate = PA > 0 ? BB / PA : null;
       const hrRate = PA > 0 ? HR / PA : null;
+
+      // Baserunning stats
+      const runsBaserunning = Number(b.b_runs_baserunning) || null;
+      // Convert baserunning runs to a speed rating (0-100 scale)
+      // Positive baserunning runs = faster than average, negative = slower
+      // If no baserunning data, use a default speed based on other stats
+      let speed = null;
+      if (runsBaserunning !== null) {
+        speed = Math.max(0, Math.min(100, 50 + (runsBaserunning * 10)));
+      } else {
+        // Fallback: estimate speed from triples and stolen bases (if available)
+        const triples = Number(b['3B']) || 0;
+        const doubles = Number(b['2B']) || 0;
+        // More triples = faster runner
+        speed = Math.max(30, Math.min(80, 50 + (triples * 5) + (doubles * 1)));
+      }
   
       return {
         name: b.name,
@@ -165,6 +193,10 @@ export function normalizeBattingStats(batters: RawBatter[]): NormalizedBatter[] 
           bbRate,
           hrRate,
           BABIP
+        },
+        baserunning: {
+          runsBaserunning,
+          speed
         }
       };
     });
@@ -217,6 +249,28 @@ export function normalizePitchingStats(pitchers: RawPitcher[]): NormalizedPitche
  */
 export function normalizeFieldingStats(fielders: RawFielder[]): any[] {
     return fielders.map(f => {
+      // Catcher-specific stats
+      const sbAllowed = Number(f.f_sb_catcher_only) || 0;
+      const cs = Number(f.f_cs_catcher_only) || 0;
+      const csPct = Number(f.f_cs_perc_catcher_only) || null;
+      const pickoffs = Number(f.f_pickoffs_catcher_only) || 0;
+
+      // Calculate arm strength from CS% (higher CS% = better arm)
+      // Convert to 0-100 scale where 50 is average
+      let armStrength = null;
+      if (csPct !== null) {
+        armStrength = Math.max(0, Math.min(100, 50 + (csPct - 25) * 2));
+      } else {
+        // Fallback: estimate arm strength from caught stealing vs stolen bases allowed
+        if (sbAllowed > 0 || cs > 0) {
+          const csRate = sbAllowed > 0 ? cs / (cs + sbAllowed) : 0.25;
+          armStrength = Math.max(20, Math.min(80, 50 + (csRate - 0.25) * 100));
+        } else {
+          // Default arm strength for catchers without CS data
+          armStrength = 50;
+        }
+      }
+
       return {
         name: f.name,
         player_id: f.player_id,
@@ -231,6 +285,12 @@ export function normalizeFieldingStats(fielders: RawFielder[]): any[] {
           FP: typeof f.FP === 'string' ? Number(f.FP) : (typeof f.FP === 'number' ? f.FP : null),
           RF: typeof f.RF === 'string' ? Number(f.RF) : (typeof f.RF === 'number' ? f.RF : null),
           TZ: typeof f.TZ === 'string' ? Number(f.TZ) : (typeof f.TZ === 'number' ? f.TZ : null),
+          // Catcher stats
+          sbAllowed,
+          cs,
+          csPct,
+          pickoffs,
+          armStrength
         }
       };
     });
