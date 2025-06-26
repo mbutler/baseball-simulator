@@ -20,7 +20,7 @@ export function renderLineups(home: any, away: any): void {
         <table class="lineup-table">
           <thead><tr><th>#</th><th>Name</th><th>PA</th></tr></thead>
           <tbody>
-            ${(batters || []).slice(0, 9).map((b: any, i: number) => `<tr><td>${i+1}</td><td>${b.name || ''}</td><td>${b.PA || ''}</td></tr>`).join('')}
+            ${(batters || []).slice(0, 9).map((b: any, i: number) => `<tr><td>${i+1}</td><td>${b.name || ''}${b.position ? ` <span class='pos-label'>(${b.position})</span>` : ''}</td><td>${b.PA || ''}</td></tr>`).join('')}
           </tbody>
         </table>
         <div><strong>Pitcher:</strong> ${pitcher.name}</div>

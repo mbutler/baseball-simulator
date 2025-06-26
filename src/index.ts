@@ -96,13 +96,6 @@ async function loadTeamFile(filename: string): Promise<LoadedTeam> {
   const pitchers = normalizePitchingStats(pitchersRaw as any[]);
   const fielders = normalizeFieldingStats(fieldersRaw as any[]);
 
-  // Print all fielders for this team, or filter for a specific player
-  console.log(`All fieldersRaw for ${filename}:`, fieldersRaw.map(f => f.name));
-  const moreno = fieldersRaw.find(f => f.name.includes('Moreno'));
-  console.log(`${filename} Gabriel Moreno fielding raw:`, moreno);
-
-  console.log('Fielding table found:', !!fielding, fielding);
-
   return { batters, pitchers, fielders };
 }
 
@@ -275,20 +268,36 @@ async function loadAndDisplayLineups(): Promise<void> {
     gameStore.loadedAway = away;
     gameStore.homeFielders = home.fielders;
     gameStore.awayFielders = away.fielders;
+    // Merge batting and fielding data for each batter (home)
+    const mergedHomeBatters = home.batters.map(batter => {
+      const fielder = home.fielders.find(f => f.player_id === batter.player_id);
+      if (fielder) {
+        return { ...batter, ...fielder, stats: { ...batter.stats, ...fielder.stats }, position: fielder.position };
+      }
+      return batter;
+    });
+    // Merge batting and fielding data for each batter (away)
+    const mergedAwayBatters = away.batters.map(batter => {
+      const fielder = away.fielders.find(f => f.player_id === batter.player_id);
+      if (fielder) {
+        return { ...batter, ...fielder, stats: { ...batter.stats, ...fielder.stats }, position: fielder.position };
+      }
+      return batter;
+    });
     // Use custom lineup if set, else default
     gameStore.homeRoster = home && home.batters && home.pitchers
       ? buildRoster(
-          gameStore.customHomeLineup && gameStore.customHomeLineup.length === 9 ? gameStore.customHomeLineup : home.batters.slice(0,9).map(b=>b.player_id),
+          gameStore.customHomeLineup && gameStore.customHomeLineup.length === 9 ? gameStore.customHomeLineup : mergedHomeBatters.slice(0,9).map(b=>b.player_id),
           gameStore.customHomePitcher || home.pitchers[0].player_id,
-          home.batters,
+          mergedHomeBatters,
           home.pitchers
         )
       : null;
     gameStore.awayRoster = away && away.batters && away.pitchers
       ? buildRoster(
-          gameStore.customAwayLineup && gameStore.customAwayLineup.length === 9 ? gameStore.customAwayLineup : away.batters.slice(0,9).map(b=>b.player_id),
+          gameStore.customAwayLineup && gameStore.customAwayLineup.length === 9 ? gameStore.customAwayLineup : mergedAwayBatters.slice(0,9).map(b=>b.player_id),
           gameStore.customAwayPitcher || away.pitchers[0].player_id,
-          away.batters,
+          mergedAwayBatters,
           away.pitchers
         )
       : null;
@@ -298,12 +307,6 @@ async function loadAndDisplayLineups(): Promise<void> {
     gameStore.atBatLog = [];
     renderAllAtBatResults(gameStore.atBatLog);
     statusDiv.textContent = 'Lineups loaded. Ready to simulate!';
-
-    // --- Debug: Dump normalized rosters for both teams ---
-    console.log('--- Home Roster (normalized, ready for engine) ---');
-    console.log(JSON.stringify(gameStore.homeRoster, null, 2));
-    console.log('--- Away Roster (normalized, ready for engine) ---');
-    console.log(JSON.stringify(gameStore.awayRoster, null, 2));
 
     startGame();
   } catch (err) {
@@ -344,21 +347,39 @@ async function populateTeamDropdowns(): Promise<void> {
  */
 function updateRostersWithNewLineups(): void {
   if (!gameStore.loadedHome || !gameStore.loadedAway) return;
-  
+  // Merge batting and fielding data for each batter (home)
+  const mergedHomeBatters = (gameStore.loadedHome && gameStore.loadedHome.batters && gameStore.loadedHome.fielders)
+    ? gameStore.loadedHome.batters.map(batter => {
+        const fielder = gameStore.loadedHome!.fielders.find(f => f.player_id === batter.player_id);
+        if (fielder) {
+          return { ...batter, ...fielder, stats: { ...batter.stats, ...fielder.stats }, position: fielder.position };
+        }
+        return batter;
+      })
+    : [];
+  const mergedAwayBatters = (gameStore.loadedAway && gameStore.loadedAway.batters && gameStore.loadedAway.fielders)
+    ? gameStore.loadedAway.batters.map(batter => {
+        const fielder = gameStore.loadedAway!.fielders.find(f => f.player_id === batter.player_id);
+        if (fielder) {
+          return { ...batter, ...fielder, stats: { ...batter.stats, ...fielder.stats }, position: fielder.position };
+        }
+        return batter;
+      })
+    : [];
   // Rebuild rosters with current custom lineups
   gameStore.homeRoster = gameStore.loadedHome && gameStore.loadedHome.batters && gameStore.loadedHome.pitchers
     ? buildRoster(
-        gameStore.customHomeLineup && gameStore.customHomeLineup.length === 9 ? gameStore.customHomeLineup : gameStore.loadedHome.batters.slice(0,9).map(b=>b.player_id),
+        gameStore.customHomeLineup && gameStore.customHomeLineup.length === 9 ? gameStore.customHomeLineup : mergedHomeBatters.slice(0,9).map(b=>b.player_id),
         gameStore.customHomePitcher || gameStore.loadedHome.pitchers[0].player_id,
-        gameStore.loadedHome.batters,
+        mergedHomeBatters,
         gameStore.loadedHome.pitchers
       )
     : null;
   gameStore.awayRoster = gameStore.loadedAway && gameStore.loadedAway.batters && gameStore.loadedAway.pitchers
     ? buildRoster(
-        gameStore.customAwayLineup && gameStore.customAwayLineup.length === 9 ? gameStore.customAwayLineup : gameStore.loadedAway.batters.slice(0,9).map(b=>b.player_id),
+        gameStore.customAwayLineup && gameStore.customAwayLineup.length === 9 ? gameStore.customAwayLineup : mergedAwayBatters.slice(0,9).map(b=>b.player_id),
         gameStore.customAwayPitcher || gameStore.loadedAway.pitchers[0].player_id,
-        gameStore.loadedAway.batters,
+        mergedAwayBatters,
         gameStore.loadedAway.pitchers
       )
     : null;
@@ -518,9 +539,6 @@ if (steal2bBtn) steal2bBtn.addEventListener('click', () => {
   // Find the catcher from the defensive fielding data
   const catcher = defenseFielders ? findDefensivePlayer(defenseFielders, 'C') : { stats: { armStrength: 50 } };
   const pitcher = defenseRoster.pitcher;
-
-  console.log('UI runner object:', runner);
-  console.log('UI catcher object:', catcher);
 
   const result = attemptSteal(2, gameStore.gameState, runner, pitcher, catcher, 1);
   renderAtBatResult({
