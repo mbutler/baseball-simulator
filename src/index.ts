@@ -93,6 +93,54 @@ function endGame(winner: 'Home' | 'Away', score: number[], inning: number, lastW
   }
 }
 
+// --- Start a new game with current team selections ---
+async function startNewGame(): Promise<void> {
+  if (!statusDiv) return;
+  
+  // Reset game state but preserve loaded teams
+  gameStore.gameState = null;
+  gameStore.lastRenderedInning = 1;
+  gameStore.lastRenderedTop = true;
+  gameStore.atBatLog = [];
+  
+  // Re-enable all action buttons and remove disabled styling
+  const stickyBar = document.querySelector('.sticky-action-bar');
+  if (stickyBar) {
+    const buttons = stickyBar.querySelectorAll('button');
+    buttons.forEach(btn => {
+      btn.disabled = false;
+      btn.classList.remove('disabled-greyed');
+    });
+  }
+  
+  // Also explicitly re-enable individual buttons
+  if (nextAtBatBtn) nextAtBatBtn.disabled = false;
+  if (steal2bBtn) steal2bBtn.disabled = false;
+  if (steal3bBtn) steal3bBtn.disabled = false;
+  if (stealHomeBtn) stealHomeBtn.disabled = false;
+  if (pickoff1bBtn) pickoff1bBtn.disabled = false;
+  if (pickoff2bBtn) pickoff2bBtn.disabled = false;
+  if (pickoff3bBtn) pickoff3bBtn.disabled = false;
+  if (simulateFullGameBtn) simulateFullGameBtn.disabled = false;
+  
+  // Clear game state display
+  if (gameStateContainer) gameStateContainer.innerHTML = '';
+  if (atbatResultContainer) atbatResultContainer.innerHTML = '';
+  
+  // If teams are already loaded, just start a new game
+  if (gameStore.loadedHome && gameStore.loadedAway) {
+    startGame();
+    statusDiv.textContent = 'New game started. Ready to simulate!';
+  } else {
+    // If teams aren't loaded, try to load them from dropdowns
+    if (homeSelect && awaySelect && homeSelect.value && awaySelect.value) {
+      await loadAndDisplayLineups();
+    } else {
+      statusDiv.textContent = 'Please select home and away teams.';
+    }
+  }
+}
+
 // --- Start a new game ---
 function startGame(): void {
   if (!gameStore.homeRoster || !gameStore.awayRoster) return;
@@ -279,6 +327,24 @@ async function loadAndDisplayLineups(): Promise<void> {
 // --- Populate team dropdowns ---
 async function populateTeamDropdowns(): Promise<void> {
   if (!statusDiv) return;
+  
+  // Reset game state and re-enable all buttons
+  resetGameState();
+  
+  // Re-enable all action buttons
+  if (nextAtBatBtn) nextAtBatBtn.disabled = false;
+  if (steal2bBtn) steal2bBtn.disabled = false;
+  if (steal3bBtn) steal3bBtn.disabled = false;
+  if (stealHomeBtn) stealHomeBtn.disabled = false;
+  if (pickoff1bBtn) pickoff1bBtn.disabled = false;
+  if (pickoff2bBtn) pickoff2bBtn.disabled = false;
+  if (pickoff3bBtn) pickoff3bBtn.disabled = false;
+  if (simulateFullGameBtn) simulateFullGameBtn.disabled = false;
+  
+  // Clear game state display
+  if (gameStateContainer) gameStateContainer.innerHTML = '';
+  if (atbatResultContainer) atbatResultContainer.innerHTML = '';
+  
   statusDiv.textContent = 'Loading teams...';
   try {
     const teams = await fetchAvailableTeams();
@@ -455,7 +521,7 @@ function updateBaseActionButtons(): void {
 
 // --- Event listeners ---
 if (loadTeamsBtn) {
-  loadTeamsBtn.addEventListener('click', populateTeamDropdowns);
+  loadTeamsBtn.addEventListener('click', startNewGame);
 }
 if (homeSelect) homeSelect.addEventListener('change', loadAndDisplayLineups);
 if (awaySelect) awaySelect.addEventListener('change', loadAndDisplayLineups);
