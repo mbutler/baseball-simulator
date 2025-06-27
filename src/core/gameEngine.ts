@@ -123,18 +123,37 @@ function advanceRunners(bases: (BasePlayer | null)[], outcome: string, batter: B
   let runs = 0;
   const newBases: (BasePlayer | null)[] = [null, null, null];
 
-  // Move existing runners
+  // Move existing runners with enhanced baserunning logic
   for (let i = 2; i >= 0; i--) {
     if (!bases[i]) continue;
-    const destination = i + (
+    
+    const runner = bases[i]!; // Non-null assertion since we just checked
+    const runnerSpeed = runner.baserunning?.speed || 50; // Default to average speed
+    const runnerBaserunningValue = runner.baserunning?.runsBaserunning || 0; // Baserunning skill
+    
+    // Enhanced: Use baserunning stats to determine advancement
+    let destination = i + (
       outcome === '1B' ? 1 :
       outcome === '2B' ? 2 :
       outcome === '3B' ? 3 :
       4
     );
 
+    // Speed-based adjustments for singles and doubles
+    if (outcome === '1B') {
+      // Fast runners (speed > 70) can sometimes advance an extra base on singles
+      if (runnerSpeed > 70 && Math.random() < 0.15) {
+        destination = Math.min(destination + 1, 3);
+      }
+    } else if (outcome === '2B') {
+      // Elite baserunners (runsBaserunning > 2) are more likely to score from 1B on doubles
+      if (i === 0 && runnerBaserunningValue > 2 && Math.random() < 0.25) {
+        destination = 3; // Score from 1B on double
+      }
+    }
+
     if (destination >= 3) runs++;
-    else newBases[destination] = bases[i];
+    else newBases[destination] = runner;
   }
 
   // Place batter on base
@@ -280,8 +299,27 @@ export function simulateAtBat(
   ) {
     const forced = getForcedRunners(state.bases);
     if (forced.length >= 2) {
-      // 1% chance for triple play
-      if (Math.random() < 0.01) {
+      // Enhanced: Use fielding stats to determine triple play probability
+      let tpProb = 0.01; // Base 1% chance
+      
+      if (fielder && fielder.stats) {
+        const RF = Number(fielder.stats['RF']) || 0; // Range Factor
+        const TZ = Number(fielder.stats['TZ']) || 0; // Total Zone
+        const FP = Number(fielder.stats['FP']) || 0.985; // Fielding Percentage
+        
+        // Range Factor bonus: +0.5% per point above league average (4.5)
+        const rfBonus = Math.max(0, (RF - 4.5) * 0.005);
+        
+        // Total Zone bonus: +0.2% per point above average
+        const tzBonus = Math.max(0, TZ * 0.002);
+        
+        // Fielding Percentage bonus: +1% for elite fielders (FP > 0.995)
+        const fpBonus = FP > 0.995 ? 0.01 : 0;
+        
+        tpProb = Math.min(0.05, tpProb + rfBonus + tzBonus + fpBonus);
+      }
+      
+      if (Math.random() < tpProb) {
         triplePlayOccurred = true;
         // Remove batter and two lead forced runners
         // Remove highest base forced runners first
@@ -309,8 +347,27 @@ export function simulateAtBat(
   ) {
     const forced = getForcedRunners(state.bases);
     if (forced.length >= 1) {
-      // 25% chance for double play
-      if (Math.random() < 0.25) {
+      // Enhanced: Use fielding stats to determine double play probability
+      let dpProb = 0.25; // Base 25% chance
+      
+      if (fielder && fielder.stats) {
+        const RF = Number(fielder.stats['RF']) || 0; // Range Factor
+        const TZ = Number(fielder.stats['TZ']) || 0; // Total Zone
+        const FP = Number(fielder.stats['FP']) || 0.985; // Fielding Percentage
+        
+        // Range Factor bonus: +5% per point above league average (4.5)
+        const rfBonus = Math.max(0, (RF - 4.5) * 0.05);
+        
+        // Total Zone bonus: +2% per point above average
+        const tzBonus = Math.max(0, TZ * 0.02);
+        
+        // Fielding Percentage bonus: +10% for elite fielders (FP > 0.995)
+        const fpBonus = FP > 0.995 ? 0.10 : 0;
+        
+        dpProb = Math.min(0.60, dpProb + rfBonus + tzBonus + fpBonus);
+      }
+      
+      if (Math.random() < dpProb) {
         doublePlayOccurred = true;
         // Remove batter and lead forced runner
         // Remove highest base forced runner
@@ -364,6 +421,43 @@ export function simulateAtBat(
     const [newBases, runs] = advanceRunners(state.bases, outcome, batter as BasePlayer);
     state.bases = newBases;
     state.score[teamIndex] += runs;
+  }
+
+  // --- Enhanced Catcher Defense Logic ---
+  // Check for passed balls and wild pitches on certain outcomes
+  if (outcome === 'K' || outcome === 'BB') {
+    // Find the catcher from the defensive team
+    const catcher = safeFielders.find(f => f.position === 'C');
+    if (catcher && catcher.stats) {
+      const FP = Number(catcher.stats['FP']) || 0.985; // Fielding Percentage
+      const PB = Number(catcher.stats['PB']) || 0; // Passed Balls (lower is better)
+      
+      // Elite catchers (FP > 0.995) are less likely to allow passed balls
+      const pbProb = FP > 0.995 ? 0.001 : 0.005; // 0.1% vs 0.5% chance
+      
+      if (Math.random() < pbProb) {
+        // Passed ball: advance runners one base
+        for (let i = 2; i >= 0; i--) {
+          if (state.bases[i]) {
+            if (i === 2) {
+              // Runner on 3B scores
+              state.bases[i] = null;
+              state.score[teamIndex]++;
+            } else {
+              // Move runner up one base
+              state.bases[i + 1] = state.bases[i];
+              state.bases[i] = null;
+            }
+          }
+        }
+        return {
+          batter_id: matchup.batter_id,
+          outcome: 'Strikeout, but passed ball allows runner to advance',
+          fielder: catcher,
+          fielderPosition: 'C'
+        };
+      }
+    }
   }
 
   return {

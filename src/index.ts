@@ -117,7 +117,7 @@ function handleNextAtBat(): void {
   const roster = teamIndex === 0 ? gameStore.awayRoster : gameStore.homeRoster
   const batterIdx = state.lineupIndices[teamIndex] % roster.lineup.length
   const batter = roster.lineup[batterIdx]
-  const result = simulateAtBat(gameStore.awayMatchups, gameStore.homeMatchups, state, [], [], gameStore.awayRoster, gameStore.homeRoster)
+  const result = simulateAtBat(gameStore.awayMatchups, gameStore.homeMatchups, state, gameStore.awayFielders || [], gameStore.homeFielders || [], gameStore.awayRoster, gameStore.homeRoster)
 
   // Always log the at-bat result first (before transition)
   renderAtBatResult({

@@ -62,37 +62,64 @@ export function getAtBatProbabilities(batter: NormalizedBatter, pitcher: Normali
     const doubles = Math.max(0, bStats.doubles ?? 0);
     const triples = Math.max(0, bStats.triples ?? 0);
   
-    // Multiplicative model for rare events
-    const K = clamp01(LEAGUE_K_RATE > 0 ? (kRateB * kRateP) / LEAGUE_K_RATE : 0, 'K');
-    const BB = clamp01(LEAGUE_BB_RATE > 0 ? (bbRateB * bbRateP) / LEAGUE_BB_RATE : 0, 'BB');
-    const HR = clamp01(LEAGUE_HR_RATE > 0 ? (hrRateB * hrRateP) / LEAGUE_HR_RATE : 0, 'HR');
-    const BABIP = clamp01(avg(babipB, babipP), 'BABIP');
+    // 1. Assign K, BB, HBP, HR rates (average of batter and pitcher)
+    let K = avg(kRateB, kRateP);
+    let BB = avg(bbRateB, bbRateP);
+    let HBP_rate = PA > 0 ? HBP / PA : 0.01;
+    let HR = avg(hrRateB, hrRateP);
   
-    const HBP_rate = clamp01(PA > 0 ? HBP / PA : 0, 'HBP');
+    // 2. Compute balls in play (BIP)
+    let nonBIP = K + BB + HBP_rate + HR;
+    let BIP = Math.max(0, 1 - nonBIP);
   
-    // Remove all non-ball-in-play outcomes from total
-    const nonBIP = K + BB + HBP_rate + HR;
-    const inPlay = Math.max(0, 1 - nonBIP);
+    // 3. Use league BABIP to determine hits on BIP
+    // Use average of batter and pitcher BABIP, but clamp to [0.27, 0.33] for realism
+    const BABIP = Math.max(0.27, Math.min(0.33, avg(babipB, babipP)));
+    let hitsInPlay = BABIP * BIP;
+    let outsInPlay = BIP - hitsInPlay;
   
-    const hitRate = BABIP * inPlay;
-    const outRate = inPlay - hitRate;
+    // 4. Assign hit types using MLB splits (2023: 1B ~75%, 2B ~20%, 3B ~5% of non-HR hits)
+    const singleRate = 0.75;
+    const doubleRate = 0.20;
+    const tripleRate = 0.05;
+    let oneB = hitsInPlay * singleRate;
+    let twoB = hitsInPlay * doubleRate;
+    let threeB = hitsInPlay * tripleRate;
   
-    const totalHits = singles + doubles + triples;
-    const singleRate = totalHits > 0 ? singles / totalHits : 0.7;
-    const doubleRate = totalHits > 0 ? doubles / totalHits : 0.2;
-    const tripleRate = totalHits > 0 ? triples / totalHits : 0.1;
+    // 5. Scale down non-out events if needed to ensure outs are at least 60–65%
+    let nonOutSum = K + BB + HBP_rate + HR + oneB + twoB + threeB;
+    const minOutRate = 0.58; // 58% outs, 42% non-outs (more realistic offense)
+    if (nonOutSum > 1 - minOutRate) {
+      const scale = (1 - minOutRate) / nonOutSum;
+      K *= scale;
+      BB *= scale;
+      HBP_rate *= scale;
+      HR *= scale;
+      oneB *= scale;
+      twoB *= scale;
+      threeB *= scale;
+      // Recompute outs
+      outsInPlay = 1 - (K + BB + HBP_rate + HR + oneB + twoB + threeB);
+    }
   
-    // Clamp output probabilities
-    const result: AtBatProbabilities = {
+    // 6. Clamp and normalize
+    let result: AtBatProbabilities = {
       K: clamp01(K, 'K'),
       BB: clamp01(BB, 'BB'),
       HBP: clamp01(HBP_rate, 'HBP'),
       HR: clamp01(HR, 'HR'),
-      '1B': clamp01(hitRate * singleRate, '1B'),
-      '2B': clamp01(hitRate * doubleRate, '2B'),
-      '3B': clamp01(hitRate * tripleRate, '3B'),
-      Out: clamp01(outRate, 'Out')
+      '1B': clamp01(oneB, '1B'),
+      '2B': clamp01(twoB, '2B'),
+      '3B': clamp01(threeB, '3B'),
+      Out: clamp01(outsInPlay, 'Out')
     };
+    // Normalize to sum to 1.0
+    const total = Object.values(result).reduce((sum, prob) => sum + prob, 0);
+    if (total > 0) {
+      Object.keys(result).forEach(key => {
+        result[key as keyof AtBatProbabilities] = result[key as keyof AtBatProbabilities] / total;
+      });
+    }
     return result;
 }
 
