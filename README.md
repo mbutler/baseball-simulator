@@ -34,6 +34,75 @@ This project uses data from [Baseball Reference](https://www.baseball-reference.
 - Add new stat sources or simulation logic by following the modular structure.
 - All functions and types are documented with JSDoc for easy navigation.
 
+### Stats Used in the Probability Model
+
+The simulation uses the following player stats to determine at-bat outcomes, fielding plays, baserunning, and pitcher fatigue:
+
+#### **Batting**
+- **PA**: Plate Appearances
+- **H**: Hits
+- **HR**: Home Runs
+- **BB**: Walks
+- **SO**: Strikeouts
+- **SF**: Sacrifice Flies
+- **HBP**: Hit By Pitch
+- **singles**: Singles
+- **doubles**: Doubles
+- **triples**: Triples
+- **kRate**: Strikeout Rate (K/PA)
+- **bbRate**: Walk Rate (BB/PA)
+- **hrRate**: Home Run Rate (HR/PA)
+- **BABIP**: Batting Average on Balls in Play
+
+#### **Pitching**
+- **TBF**: Total Batters Faced
+- **IP**: Innings Pitched
+- **H**: Hits Allowed
+- **HR**: Home Runs Allowed
+- **BB**: Walks Allowed
+- **SO**: Strikeouts
+- **HBP**: Hit By Pitch
+- **kRate**: Strikeout Rate (K/TBF)
+- **bbRate**: Walk Rate (BB/TBF)
+- **hrRate**: Home Run Rate (HR/TBF)
+- **BABIP**: Batting Average on Balls in Play Allowed
+
+#### **Fielding**
+- **position**: Defensive Position
+- **G**: Games Played
+- **Inn**: Innings Played
+- **PO**: Putouts
+- **A**: Assists
+- **E**: Errors
+- **DP**: Double Plays Turned
+- **FP**: Fielding Percentage
+- **RF**: Range Factor
+- **TZ**: Total Zone Runs
+
+#### **Catching**
+- **sbAllowed**: Stolen Bases Allowed
+- **cs**: Caught Stealing
+- **csPct**: Caught Stealing Percentage
+- **pickoffs**: Pickoffs
+- **armStrength**: Arm Strength
+- **PB**: Passed Balls
+
+#### **Baserunning**
+- **runsBaserunning**: Baserunning Value
+- **speed**: Speed Rating
+
+#### **Fatigue**
+- **battersFaced**: Batters faced by current pitcher (used for fatigue effects)
+
+These stats are used in combination to determine:
+- At-bat outcome probabilities (K, BB, HR, 1B, 2B, 3B, Out)
+- Double/triple play chances (fielding stats)
+- Error rates (fielding stats)
+- Steal and pickoff success (baserunning, catcher, pitcher stats)
+- Passed ball/wild pitch rates (catcher stats)
+- Baserunner advancement (speed, baserunning value)
+- Pitcher fatigue effects (batters faced)
+
 ---
 For more details, see the JSDoc comments in each source file.
 

@@ -8,6 +8,8 @@ import { describeOutcome } from '../utils/describeOutcome.js';
 import type { Matchup, Roster } from './matchupPreparer.js';
 import type { NormalizedBatter } from '../types/baseball.js';
 import type { NormalizedBatter as StatNormalizedBatter } from '../types/baseball.js';
+import { getAtBatProbabilities } from './probabilityModel.js';
+import type { AtBatSituation } from './probabilityModel.js';
 
 /**
  * @typedef {Object} GameState
@@ -213,7 +215,15 @@ export function simulateAtBat(
   const batterIndex = state.lineupIndices[teamIndex];
   const matchup = lineup[batterIndex % lineup.length];
   const batter = roster.lineup[batterIndex % roster.lineup.length];
-  let probabilities = matchup.probabilities;
+
+  // --- Situational Hitting Detection ---
+  const risp = !!(state.bases[1] || state.bases[2]); // runner on 2B or 3B
+  const late = state.inning >= 8 && Math.abs(state.score[0] - state.score[1]) <= 2;
+  const twoOuts = state.outs === 2;
+  const situation: AtBatSituation = { risp, late, twoOuts };
+
+  // Use situational probabilities
+  let probabilities = getAtBatProbabilities(batter, roster.pitcher, situation);
 
   // --- Pitcher Fatigue Logic ---
   if (state.pitcherFatigue && state.pitcherFatigue[1 - teamIndex]) {
@@ -239,7 +249,7 @@ export function simulateAtBat(
     }
   }
 
-  const outcome = _randomWeightedChoice(probabilities);
+  const outcome = _randomWeightedChoice(probabilities as unknown as Record<string, number>);
   const descriptiveOutcome = _describeOutcome(outcome);
 
   state.lineupIndices[teamIndex]++;
