@@ -29,13 +29,14 @@ export function buildRoster(
     const pitcher = pitchers.find(p => p.player_id === pitcherId);
     if (!pitcher) throw new Error(`Starting pitcher not found: ${pitcherId}`);
   
-    // Ensure no duplicate player_ids
+    // Ensure no duplicate player_ids in the lineup
     const seen = new Set<string>();
     for (const p of lineup) {
       if (seen.has(p.player_id)) throw new Error(`Duplicate player in lineup: ${p.player_id}`);
       seen.add(p.player_id);
     }
-    if (seen.has(pitcherId)) throw new Error(`Pitcher also appears in lineup: ${pitcherId}`);
+    // Two-way players (e.g., Ohtani) are allowed to be both pitcher and in the lineup
+    // (do not throw if pitcherId is in the lineup)
   
     return {
       lineup,

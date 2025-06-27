@@ -270,7 +270,9 @@ async function loadAndDisplayLineups(): Promise<void> {
 
     startGame();
   } catch (err) {
-    statusDiv.textContent = 'Failed to load lineups.';
+    console.error('Failed to load lineups:', err);
+    const errorMessage = err && typeof err === 'object' && 'message' in err ? err.message : String(err);
+    statusDiv.textContent = `Failed to load lineups: ${errorMessage}`;
   }
 }
 
@@ -278,27 +280,43 @@ async function loadAndDisplayLineups(): Promise<void> {
 async function populateTeamDropdowns(): Promise<void> {
   if (!statusDiv) return;
   statusDiv.textContent = 'Loading teams...';
-  const teams = await fetchAvailableTeams();
-  if (!teams.length) {
-    statusDiv.textContent = 'No teams found in data folder.';
-    return;
-  }
-  for (const select of [homeSelect, awaySelect]) {
-    if (!select) continue;
-    select.innerHTML = '';
-    for (const teamFile of teams) {
-      const option = document.createElement('option');
-      option.value = teamFile;
-      option.textContent = teamFile.replace('.html', '');
-      select.appendChild(option);
+  try {
+    const teams = await fetchAvailableTeams();
+    if (!teams.length) {
+      statusDiv.textContent = 'No teams found in data folder.';
+      return;
     }
-  }
-  // Set default selections: CHC home, MIL away
-  if (homeSelect) homeSelect.value = 'CHC-2025.html';
-  if (awaySelect) awaySelect.value = 'MIL-2025.html';
-  statusDiv.textContent = 'Select home and away teams.';
-  if (homeSelect && awaySelect) {
-    loadAndDisplayLineups();
+    for (const select of [homeSelect, awaySelect]) {
+      if (!select) continue;
+      select.innerHTML = '';
+      for (const teamCode of teams) {
+        const option = document.createElement('option');
+        option.value = teamCode;
+        option.textContent = teamCode;
+        select.appendChild(option);
+      }
+    }
+    
+    // Set default selections dynamically based on available teams
+    // Prefer CHC and MIL if available, otherwise use first two teams
+    const preferredHome = 'CHC-2025';
+    const preferredAway = 'MIL-2025';
+    
+    if (homeSelect) {
+      homeSelect.value = teams.includes(preferredHome) ? preferredHome : teams[0] || '';
+    }
+    if (awaySelect) {
+      awaySelect.value = teams.includes(preferredAway) ? preferredAway : teams[1] || teams[0] || '';
+    }
+    
+    statusDiv.textContent = 'Select home and away teams.';
+    if (homeSelect && awaySelect && homeSelect.value && awaySelect.value) {
+      loadAndDisplayLineups();
+    }
+  } catch (err) {
+    console.error('Failed to populate team dropdowns:', err);
+    const errorMessage = err && typeof err === 'object' && 'message' in err ? err.message : String(err);
+    statusDiv.textContent = `Failed to load teams: ${errorMessage}`;
   }
 }
 

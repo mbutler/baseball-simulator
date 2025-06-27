@@ -132,20 +132,17 @@ export async function loadDataset(): Promise<CompleteDataset> {
  */
 export async function getAvailableTeams(): Promise<string[]> {
   const dataset = await loadDataset();
-  return dataset.teams.map(team => `${team.team}-${team.year}.html`);
+  return dataset.teams.map(team => `${team.team}-${team.year}`);
 }
 
 /**
- * Load team data by filename (maintains compatibility with existing code)
+ * Load team data by team code (e.g., "CHC-2025")
  */
-export async function loadTeamFile(filename: string): Promise<LoadedTeam> {
+export async function loadTeamFile(teamCode: string): Promise<LoadedTeam> {
   const dataset = await loadDataset();
   
-  // Extract team code from filename (e.g., "CHC-2025.html" -> "CHC")
-  const teamCode = filename.replace('.html', '').split('-')[0];
-  
   // Find the team in the dataset
-  const teamData = dataset.teams.find(team => team.team === teamCode);
+  const teamData = dataset.teams.find(team => `${team.team}-${team.year}` === teamCode);
   if (!teamData) {
     throw new Error(`Team ${teamCode} not found in dataset`);
   }

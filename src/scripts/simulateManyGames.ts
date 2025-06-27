@@ -1,12 +1,26 @@
-import { loadTeamFile } from '../utils/dataLoader.js';
+import { loadTeamFile, getAvailableTeams } from '../utils/dataLoader.js';
 import { buildRoster } from '../core/rosterBuilder.js';
 import { prepareMatchups } from '../core/matchupPreparer.js';
 import { initGameState, simulateAtBat } from '../core/gameEngine.js';
 import { checkGameEnd } from '../core/gameEndLogic.js';
 
-const HOME_TEAM = 'CHC-2025.html';
-const AWAY_TEAM = 'MIL-2025.html';
 const NUM_GAMES = 25;
+
+async function getDefaultTeams(): Promise<{ home: string, away: string }> {
+  const teams = await getAvailableTeams();
+  if (teams.length < 2) {
+    throw new Error(`Need at least 2 teams, but only ${teams.length} available`);
+  }
+  
+  // Prefer CHC and MIL if available, otherwise use first two teams
+  const preferredHome = 'CHC-2025';
+  const preferredAway = 'MIL-2025';
+  
+  const home = teams.includes(preferredHome) ? preferredHome : teams[0];
+  const away = teams.includes(preferredAway) ? preferredAway : teams[1];
+  
+  return { home, away };
+}
 
 async function simulateGame(homeFile: string, awayFile: string): Promise<{away: number, home: number}> {
   // Load teams
@@ -100,6 +114,11 @@ async function simulateGame(homeFile: string, awayFile: string): Promise<{away: 
 
 async function main() {
   console.log(`Starting simulation of ${NUM_GAMES} games...`);
+  
+  // Get available teams dynamically
+  const { home: HOME_TEAM, away: AWAY_TEAM } = await getDefaultTeams();
+  console.log(`Using teams: ${HOME_TEAM} (home) vs ${AWAY_TEAM} (away)`);
+  
   let totalHome = 0, totalAway = 0;
   let homeWins = 0, awayWins = 0, ties = 0;
   const scoreDist: Record<string, number> = {};
@@ -115,7 +134,7 @@ async function main() {
     const key = `${away}-${home}`;
     scoreDist[key] = (scoreDist[key] || 0) + 1;
   }
-  console.log(`\nSimulated ${NUM_GAMES} games: ${HOME_TEAM.replace('.html','')} (home) vs ${AWAY_TEAM.replace('.html','')} (away)`);
+  console.log(`\nSimulated ${NUM_GAMES} games: ${HOME_TEAM} (home) vs ${AWAY_TEAM} (away)`);
   console.log(`Average Home: ${(totalHome/NUM_GAMES).toFixed(2)}, Average Away: ${(totalAway/NUM_GAMES).toFixed(2)}`);
   console.log(`Home Wins: ${homeWins}, Away Wins: ${awayWins}, Ties: ${ties}`);
   console.log('Score distribution (Away-Home):');

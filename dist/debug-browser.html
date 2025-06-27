@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Team Loading</title>
+</head>
+<body>
+    <h1>Debug Team Loading</h1>
+    <div id="output"></div>
+    
+    <script type="module">
+        async function debugTeams() {
+            const output = document.getElementById('output');
+            
+            try {
+                output.innerHTML += '<p>🔍 Debugging team loading...</p>';
+                
+                // Test fetching the JSON file directly
+                output.innerHTML += '<p>📋 Testing JSON file fetch...</p>';
+                const response = await fetch('./complete-dataset-2025.json');
+                if (!response.ok) {
+                    throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
+                }
+                
+                const dataset = await response.json();
+                output.innerHTML += `<p>✅ JSON loaded: ${dataset.teams.length} teams</p>`;
+                
+                // Test getting available teams
+                const teams = dataset.teams.map(team => `${team.team}-${team.year}`);
+                output.innerHTML += `<p>📋 Found ${teams.length} teams: ${teams.slice(0, 5).join(', ')}...</p>`;
+                
+                // Test loading a specific team
+                if (teams.length > 0) {
+                    const testTeam = teams[0];
+                    output.innerHTML += `<p>🧪 Testing team loading for: ${testTeam}</p>`;
+                    
+                    const teamData = dataset.teams.find(team => `${team.team}-${team.year}` === testTeam);
+                    if (teamData) {
+                        const batters = teamData.players.filter(p => p.batting);
+                        const pitchers = teamData.players.filter(p => p.pitching);
+                        const fielders = teamData.players.filter(p => p.fielding);
+                        
+                        output.innerHTML += `<p>✅ Successfully loaded ${testTeam}:</p>`;
+                        output.innerHTML += `<p>   Batters: ${batters.length}</p>`;
+                        output.innerHTML += `<p>   Pitchers: ${pitchers.length}</p>`;
+                        output.innerHTML += `<p>   Fielders: ${fielders.length}</p>`;
+                        
+                        if (batters.length > 0) {
+                            output.innerHTML += `<p>   First batter: ${batters[0].name}</p>`;
+                        }
+                        if (pitchers.length > 0) {
+                            output.innerHTML += `<p>   First pitcher: ${pitchers[0].name}</p>`;
+                        }
+                    }
+                }
+                
+                // Test loading CHC and CHW specifically
+                output.innerHTML += '<p>🧪 Testing CHC and CHW specifically...</p>';
+                const chc = dataset.teams.find(team => team.team === 'CHC');
+                if (chc) {
+                    const chcBatters = chc.players.filter(p => p.batting);
+                    const chcPitchers = chc.players.filter(p => p.pitching);
+                    output.innerHTML += `<p>✅ CHC loaded: ${chcBatters.length} batters, ${chcPitchers.length} pitchers</p>`;
+                } else {
+                    output.innerHTML += '<p>❌ CHC not found</p>';
+                }
+                
+                const chw = dataset.teams.find(team => team.team === 'CHW');
+                if (chw) {
+                    const chwBatters = chw.players.filter(p => p.batting);
+                    const chwPitchers = chw.players.filter(p => p.pitching);
+                    output.innerHTML += `<p>✅ CHW loaded: ${chwBatters.length} batters, ${chwPitchers.length} pitchers</p>`;
+                } else {
+                    output.innerHTML += '<p>❌ CHW not found</p>';
+                }
+                
+            } catch (error) {
+                output.innerHTML += `<p>❌ Debug failed: ${error.message}</p>`;
+                console.error('Debug error:', error);
+            }
+        }
+        
+        debugTeams();
+    </script>
+</body>
+</html> 
