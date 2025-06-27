@@ -5,6 +5,7 @@ import {
   atbatResultContainer,
   nextAtBatBtn
 } from './domElements';
+import { convertPositionCode } from '../utils/describeOutcome.js';
 
 // --- Render lineups ---
 export function renderLineups(home: any, away: any): void {
@@ -18,9 +19,13 @@ export function renderLineups(home: any, away: any): void {
       <div style="margin-bottom:1.5em;">
         <strong>${label} Lineup</strong>
         <table class="lineup-table">
-          <thead><tr><th>#</th><th>Name</th><th>PA</th></tr></thead>
+          <thead><tr><th>#</th><th>Name</th><th>BABIP</th></tr></thead>
           <tbody>
-            ${(batters || []).slice(0, 9).map((b: any, i: number) => `<tr><td>${i+1}</td><td>${b.name || ''}${b.position ? ` <span class='pos-label'>(${b.position})</span>` : ''}</td><td>${b.PA || ''}</td></tr>`).join('')}
+            ${(batters || []).slice(0, 9).map((b: any, i: number) => {
+              const position = b.position ? convertPositionCode(b.position) : '';
+              const babip = b.rates?.BABIP ? Number(b.rates.BABIP).toFixed(3) : '';
+              return `<tr><td>${i+1}</td><td>${b.name || ''}${position ? ` <span class='pos-label'>(${position})</span>` : ''}</td><td>${babip}</td></tr>`;
+            }).join('')}
           </tbody>
         </table>
         <div><strong>Pitcher:</strong> ${pitcher.name}</div>

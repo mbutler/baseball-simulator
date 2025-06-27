@@ -307,6 +307,11 @@ async function populateTeamDropdowns(): Promise<void> {
  */
 function updateRostersWithNewLineups(): void {
   if (!gameStore.loadedHome || !gameStore.loadedAway) return;
+  
+  // Check if pitchers have changed and reset fatigue if needed
+  const oldHomePitcher = gameStore.homeRoster?.pitcher?.player_id;
+  const oldAwayPitcher = gameStore.awayRoster?.pitcher?.player_id;
+  
   // Merge batting and fielding data for each batter (home)
   const mergedHomeBatters = (gameStore.loadedHome && gameStore.loadedHome.batters && gameStore.loadedHome.fielders)
     ? gameStore.loadedHome.batters.map(batter => {
@@ -343,6 +348,24 @@ function updateRostersWithNewLineups(): void {
         gameStore.loadedAway.pitchers
       )
     : null;
+  
+  // Check if pitchers changed and reset fatigue accordingly
+  const newHomePitcher = gameStore.homeRoster?.pitcher?.player_id;
+  const newAwayPitcher = gameStore.awayRoster?.pitcher?.player_id;
+  
+  if (gameStore.gameState && gameStore.gameState.pitcherFatigue) {
+    // Reset home pitcher fatigue if home pitcher changed
+    if (oldHomePitcher && newHomePitcher && oldHomePitcher !== newHomePitcher) {
+      gameStore.gameState.pitcherFatigue[1] = { battersFaced: 0 };
+      console.log(`🔄 Home pitcher changed from ${oldHomePitcher} to ${newHomePitcher} - fatigue reset`);
+    }
+    
+    // Reset away pitcher fatigue if away pitcher changed
+    if (oldAwayPitcher && newAwayPitcher && oldAwayPitcher !== newAwayPitcher) {
+      gameStore.gameState.pitcherFatigue[0] = { battersFaced: 0 };
+      console.log(`🔄 Away pitcher changed from ${oldAwayPitcher} to ${newAwayPitcher} - fatigue reset`);
+    }
+  }
   
   // Rebuild matchups for future at-bats
   if (gameStore.homeRoster && gameStore.awayRoster) {
