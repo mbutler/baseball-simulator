@@ -70,15 +70,15 @@ describe('Probability Model Debug', () => {
     console.log('3B rate:', probabilities['3B'])
     console.log('Out rate:', probabilities.Out)
     
-    // Updated realistic ranges
+    // With minOutRate 0.65, Out is scaled to 65%; other rates scale down proportionally
     expect(total).toBeCloseTo(1.0, 2) // Should sum to 1.0
-    expect(probabilities.K).toBeGreaterThan(0.12) // Should be 12-22%
-    expect(probabilities.K).toBeLessThan(0.22)
-    expect(probabilities.BB).toBeGreaterThan(0.06) // Should be 6-12%
+    expect(probabilities.K).toBeGreaterThan(0.08) // Scaled from raw ~20%
+    expect(probabilities.K).toBeLessThan(0.20)
+    expect(probabilities.BB).toBeGreaterThan(0.04)
     expect(probabilities.BB).toBeLessThan(0.12)
-    expect(probabilities.HR).toBeGreaterThan(0.01) // Should be around 2-4%
+    expect(probabilities.HR).toBeGreaterThan(0.01)
     expect(probabilities.HR).toBeLessThan(0.05)
-    expect(probabilities.Out).toBeGreaterThan(0.55) // Should be 55-68%
+    expect(probabilities.Out).toBeGreaterThan(0.62) // minOutRate 65%
     expect(probabilities.Out).toBeLessThan(0.70)
   })
 
@@ -142,11 +142,11 @@ describe('Probability Model Debug', () => {
     // Even in extreme cases, should still sum to 1
     expect(total).toBeCloseTo(1.0, 2)
     
-    // Should have higher offensive rates, but still within realistic bounds
-    expect(probabilities.K).toBeGreaterThan(0.08) // Lower K rate
+    // Log5 produces more extreme matchup results: elite batter vs poor pitcher = very low K
+    expect(probabilities.K).toBeGreaterThan(0.02) // Can be quite low with log5
     expect(probabilities.K).toBeLessThan(0.20)
     expect(probabilities.BB).toBeGreaterThan(0.07) // Higher BB rate
-    expect(probabilities.BB).toBeLessThan(0.13)
+    expect(probabilities.BB).toBeLessThan(0.20) // Log5 can push higher
     expect(probabilities.HR).toBeGreaterThan(0.02) // Higher HR rate
     expect(probabilities.HR).toBeLessThan(0.06)
     expect(probabilities.Out).toBeGreaterThan(0.55) // Lower out rate

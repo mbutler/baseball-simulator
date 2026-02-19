@@ -4,13 +4,29 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Baseball Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
   <style>
     :root {
-      --primary-color: #0066cc;
-      --accent-color: #e0f0ff;
-      --success-color: #28a745;
-      --danger-color: #dc3545;
-      --border-radius: 12px;
+      --bg: #f5f5f4;
+      --surface: #ffffff;
+      --surface-elevated: #fafaf9;
+      --text: #1c1917;
+      --text-muted: #78716c;
+      --border: #e7e5e4;
+      --primary: #0f172a;
+      --primary-hover: #1e293b;
+      --accent: #0ea5e9;
+      --accent-hover: #0284c7;
+      --success: #059669;
+      --success-hover: #047857;
+      --danger: #dc2626;
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
     }
 
     * {
@@ -19,319 +35,596 @@
 
     body {
       margin: 0;
-      font-family: system-ui, sans-serif;
-      background-color: #f2f4f7;
-      color: #333;
+      font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
 
     #simulator-app {
-      max-width: 700px;
-      margin: 1.5em auto 5em;
-      padding: 1em;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 16px;
+      padding-bottom: 140px;
     }
 
-    h1 {
+    .app-header {
       text-align: center;
-      font-size: 1.8em;
-      margin-bottom: 1em;
+      margin-bottom: 20px;
     }
 
+    .app-header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin: 0;
+      color: var(--text);
+    }
+
+    /* Compact controls row */
     .controls {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.75em;
-      justify-content: center;
-      background: white;
-      padding: 1em;
-      border-radius: var(--border-radius);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+      gap: 8px;
+      align-items: center;
+      background: var(--surface);
+      padding: 12px 14px;
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+    }
+
+    .controls .team-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .controls label {
+      font-size: 12px;
       font-weight: 500;
+      color: var(--text-muted);
+      white-space: nowrap;
     }
 
-    .controls select,
-    .controls button {
-      font-size: 1em;
-      padding: 0.5em 0.75em;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      background: white;
-      flex: 1 1 auto;
+    .controls select {
+      font-family: inherit;
+      font-size: 13px;
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      min-width: 0;
     }
 
-    .controls button {
-      background: var(--primary-color);
-      color: white;
+    .controls select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+    }
+
+    .controls .btn {
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
       border: none;
       cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
     }
 
-    .controls button:hover {
-      background: #0052a3;
+    .controls .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .controls .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .controls .btn-ghost {
+      background: var(--surface-elevated);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .controls .btn-ghost:hover {
+      background: var(--border);
     }
 
     #status {
-      margin-top: 1em;
+      margin-top: 10px;
       text-align: center;
-      font-size: 0.95em;
-      color: #555;
-      min-height: 1.2em;
+      font-size: 13px;
+      color: var(--text-muted);
+      min-height: 20px;
     }
 
+    /* Sections */
     .section {
-      margin-top: 2em;
-      background: white;
-      border-radius: var(--border-radius);
-      padding: 1em;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+      margin-top: 16px;
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
     }
 
-    h2 {
-      font-size: 1.2em;
-      margin-bottom: 0.75em;
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin: 0 0 10px 0;
+    }
+
+    /* Lineup tables */
+    .lineups-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 520px) {
+      .lineups-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .lineup-block {
+      min-width: 0;
+    }
+
+    .lineup-block .block-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 8px;
     }
 
     .lineup-table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 0.5em;
+      font-size: 13px;
     }
 
     .lineup-table th,
     .lineup-table td {
-      border: 1px solid #ddd;
-      padding: 0.5em;
+      padding: 6px 8px;
       text-align: left;
-      font-size: 0.95em;
+      border-bottom: 1px solid var(--border);
     }
 
+    .lineup-table th {
+      font-weight: 500;
+      color: var(--text-muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .lineup-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .pos-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .pitcher-row {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .pitcher-row strong {
+      color: var(--text);
+    }
+
+    /* Game state card */
     .game-state {
-      background: var(--accent-color);
-      padding: 1em;
-      border-radius: 8px;
-      font-size: 1em;
-      line-height: 1.4;
+      background: var(--surface-elevated);
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      border: 1px solid var(--border);
     }
 
+    .game-state-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 8px 16px;
+    }
+
+    .game-state-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .game-state-item .label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .game-state-item .value {
+      font-weight: 600;
+    }
+
+    .game-state-item .text-muted {
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .game-state-item.at-bat {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* At-bat log */
     #atbat-result-container {
-      max-height: 300px;
+      max-height: 220px;
       overflow-y: auto;
-      padding-right: 0.5em;
+      font-size: 13px;
     }
 
+    #atbat-result-container::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    #atbat-result-container::-webkit-scrollbar-track {
+      background: var(--surface-elevated);
+      border-radius: 3px;
+    }
+
+    #atbat-result-container::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+
+    .inning-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 12px;
+      margin-bottom: 4px;
+    }
+
+    .inning-label:first-child {
+      margin-top: 0;
+    }
+
+    .atbat-entry {
+      padding: 4px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .atbat-entry:last-child {
+      border-bottom: none;
+    }
+
+    .atbat-entry .meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Sticky action bar - compact */
     .sticky-action-bar {
-      position: sticky;
+      position: fixed;
       bottom: 0;
-      background: white;
-      padding: 1em;
-      border-top: 1px solid #ddd;
-      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+      left: 0;
+      right: 0;
+      background: var(--surface);
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+      box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
       z-index: 50;
     }
 
     .sticky-action-bar .base-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5em;
-      justify-content: center;
-      margin-bottom: 0.75em;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+      margin-bottom: 8px;
     }
 
-    .sticky-action-bar button {
-      flex: 1 1 45%;
-      padding: 0.5em;
-      font-size: 1em;
-      border: none;
-      border-radius: 6px;
-      background: #f0f0f0;
-      border: 1px solid #ccc;
+    @media (max-width: 520px) {
+      .sticky-action-bar .base-actions {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    .sticky-action-bar .btn {
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 8px 6px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface-elevated);
+      color: var(--text);
       cursor: pointer;
+      transition: all 0.15s;
     }
 
-    .sticky-action-bar button:hover {
-      background: #e2e2e2;
+    .sticky-action-bar .btn:hover:not(:disabled) {
+      background: var(--border);
+      border-color: var(--text-muted);
+    }
+
+    .sticky-action-bar .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .sticky-action-bar .main-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
     }
 
     .sticky-action-bar #next-atbat-btn {
-      width: 100%;
-      background: var(--success-color);
+      flex: 1;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 10px 16px;
+      background: var(--success);
       color: white;
-      font-weight: bold;
+      border: none;
     }
 
-    .sticky-action-bar #next-atbat-btn:hover {
-      background: #218838;
+    .sticky-action-bar #next-atbat-btn:hover:not(:disabled) {
+      background: var(--success-hover);
+    }
+
+    .sticky-action-bar #next-atbat-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .sticky-action-bar #simulate-full-game-btn {
-      width: auto;
-      font-size: 0.95em;
-      padding: 0.3em 0.8em;
-      margin-top: 0.5em;
-      margin-left: 0.5em;
-      background: #444;
-      color: #fff;
-      border: 1px solid #222;
-      border-radius: 6px;
+      font-size: 12px;
+      padding: 8px 14px;
+      background: var(--primary);
+      color: white;
+      border: none;
     }
-    .sticky-action-bar #simulate-full-game-btn:hover {
-      background: #222;
-    }
-    
 
+    .sticky-action-bar #simulate-full-game-btn:hover:not(:disabled) {
+      background: var(--primary-hover);
+    }
+
+    .sticky-action-bar .disabled-greyed {
+      opacity: 0.5 !important;
+      cursor: not-allowed !important;
+      background: var(--border) !important;
+      color: var(--text-muted) !important;
+      border-color: var(--border) !important;
+    }
+
+    /* Modal */
     #custom-lineup-modal {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.6);
+      background: rgba(15, 23, 42, 0.5);
+      backdrop-filter: blur(4px);
       z-index: 1000;
       align-items: center;
       justify-content: center;
-      padding: 1em;
+      padding: 16px;
     }
 
-
     #custom-lineup-modal .modal-content {
-      background: white;
-      padding: 1.5em;
-      border-radius: var(--border-radius);
+      background: var(--surface);
+      padding: 20px;
+      border-radius: var(--radius-lg);
       width: 100%;
-      max-width: 480px;
+      max-width: 400px;
       position: relative;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      box-shadow: var(--shadow-md);
+      border: 1px solid var(--border);
     }
 
     #close-lineup-modal {
       position: absolute;
-      top: 0.5em;
-      right: 0.75em;
+      top: 12px;
+      right: 12px;
       background: none;
       border: none;
-      font-size: 1.5em;
+      font-size: 1.25rem;
+      color: var(--text-muted);
       cursor: pointer;
+      padding: 4px;
+      line-height: 1;
+    }
+
+    #close-lineup-modal:hover {
+      color: var(--text);
+    }
+
+    #lineup-modal-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 0 0 16px 0;
+    }
+
+    #custom-lineup-form h3 {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin: 12px 0 8px 0;
     }
 
     #batting-order-list {
-      padding-left: 1.2em;
+      padding-left: 1.25rem;
+      margin: 0;
+    }
+
+    #batting-order-list li {
+      margin-bottom: 6px;
+    }
+
+    #batting-order-list select {
+      font-family: inherit;
+      font-size: 13px;
+      padding: 6px 8px;
+      width: 100%;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
     }
 
     #pitcher-select {
+      font-family: inherit;
+      font-size: 13px;
+      padding: 8px 10px;
       width: 100%;
-      margin-top: 0.5em;
-      padding: 0.5em;
-      font-size: 1em;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
     }
 
     #save-lineup-btn {
-      margin-top: 1.5em;
-      padding: 0.6em 1.2em;
-      background: var(--primary-color);
+      margin-top: 16px;
+      width: 100%;
+      padding: 10px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      background: var(--primary);
       color: white;
       border: none;
-      border-radius: 6px;
-      font-size: 1em;
-      width: 100%;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+    }
+
+    #save-lineup-btn:hover {
+      background: var(--primary-hover);
     }
 
     #lineup-error {
-      color: var(--danger-color);
-      margin-top: 1em;
+      font-size: 13px;
+      color: var(--danger);
+      margin-top: 10px;
     }
 
-    @media (max-width: 600px) {
-      .controls {
-        flex-direction: column;
+    /* Mobile adjustments */
+    @media (max-width: 520px) {
+      #simulator-app {
+        padding: 12px;
+        padding-bottom: 150px;
       }
 
-      .controls select,
-      .controls button,
-      .base-actions button {
+      .controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .controls .team-group {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .controls .team-group label {
+        margin-bottom: 2px;
+      }
+
+      .controls .btn {
         width: 100%;
       }
 
-      .lineup-table th,
-      .lineup-table td {
-        font-size: 0.9em;
+      .section {
+        padding: 12px 14px;
       }
 
-      .base-actions {
-        gap: 0.75em;
+      .sticky-action-bar .main-actions {
+        flex-direction: column;
       }
-    }
 
-    .sticky-action-bar .disabled-greyed {
-      opacity: 0.5;
-      cursor: not-allowed;
-      background: #ccc !important;
-      color: #888 !important;
-      border-color: #bbb !important;
+      .sticky-action-bar .main-actions .btn {
+        width: 100%;
+      }
     }
   </style>
 </head>
 <body>
   <div id="simulator-app">
-    <h1>Baseball Simulator</h1>
+    <header class="app-header">
+      <h1>Baseball Simulator</h1>
+    </header>
 
     <div class="controls">
-      <label for="home-team-select">Home</label>
-      <select id="home-team-select"></select>
-
-      <label for="away-team-select">Away</label>
-      <select id="away-team-select"></select>
-
-      <button id="load-teams-btn">New Game</button>
-      <button id="customize-home-lineup-btn">Customize Home Lineup</button>
-      <button id="customize-away-lineup-btn">Customize Away Lineup</button>
+      <div class="team-group">
+        <label for="home-team-select">Home</label>
+        <select id="home-team-select"></select>
+      </div>
+      <div class="team-group">
+        <label for="away-team-select">Away</label>
+        <select id="away-team-select"></select>
+      </div>
+      <button id="load-teams-btn" class="btn btn-primary">New Game</button>
+      <button id="customize-home-lineup-btn" class="btn btn-ghost">Home Lineup</button>
+      <button id="customize-away-lineup-btn" class="btn btn-ghost">Away Lineup</button>
     </div>
 
     <div id="status"></div>
 
-    <div class="section" id="lineups-section">
-      <h2>Lineups</h2>
+    <section class="section" id="lineups-section">
+      <h2 class="section-title">Lineups</h2>
       <div id="lineups-container"></div>
-    </div>
+    </section>
 
-    <div class="section" id="game-section">
-      <h2>Game State</h2>
+    <section class="section" id="game-section">
+      <h2 class="section-title">Game State</h2>
       <div class="game-state" id="game-state-container"></div>
-    </div>
+    </section>
 
-    <div class="section" id="atbat-section">
-      <h2>At-Bat Result</h2>
+    <section class="section" id="atbat-section">
+      <h2 class="section-title">Play-by-Play</h2>
       <div id="atbat-result-container"></div>
-    </div>
+    </section>
   </div>
 
-  <!-- Sticky Controls -->
   <div class="sticky-action-bar">
     <div class="base-actions">
-      <button id="steal-2b-btn">Steal 2B</button>
-      <button id="steal-3b-btn">Steal 3B</button>
-      <button id="steal-home-btn">Steal Home</button>
-      <button id="pickoff-1b-btn">Pickoff 1B</button>
-      <button id="pickoff-2b-btn">Pickoff 2B</button>
-      <button id="pickoff-3b-btn">Pickoff 3B</button>
+      <button id="steal-2b-btn" class="btn">Steal 2B</button>
+      <button id="steal-3b-btn" class="btn">Steal 3B</button>
+      <button id="steal-home-btn" class="btn">Steal Home</button>
+      <button id="pickoff-1b-btn" class="btn">Pick 1B</button>
+      <button id="pickoff-2b-btn" class="btn">Pick 2B</button>
+      <button id="pickoff-3b-btn" class="btn">Pick 3B</button>
     </div>
-    <button id="next-atbat-btn" style="display:none;">Next At-Bat</button>
-    <button id="simulate-full-game-btn">Simulate Full Game</button>
+    <div class="main-actions">
+      <button id="next-atbat-btn" class="btn" style="display:none;">Next At-Bat</button>
+      <button id="simulate-full-game-btn" class="btn">Simulate Game</button>
+    </div>
   </div>
 
-  <!-- Modal -->
   <div id="custom-lineup-modal">
     <div class="modal-content">
-      <button id="close-lineup-modal">&times;</button>
+      <button id="close-lineup-modal" aria-label="Close">&times;</button>
       <h2 id="lineup-modal-title">Customize Lineup</h2>
       <form id="custom-lineup-form">
-        <div>
-          <h3>Batting Order</h3>
-          <ol id="batting-order-list"></ol>
-        </div>
-        <div>
-          <h3>Starting Pitcher</h3>
-          <select id="pitcher-select"></select>
-        </div>
+        <h3>Batting Order</h3>
+        <ol id="batting-order-list"></ol>
+        <h3>Starting Pitcher</h3>
+        <select id="pitcher-select"></select>
         <button type="submit" id="save-lineup-btn">Use This Lineup</button>
       </form>
       <div id="lineup-error"></div>

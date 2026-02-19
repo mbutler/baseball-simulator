@@ -421,6 +421,14 @@ export function simulateAtBat(
     };
   }
 
+  // --- Sacrifice fly: Flyout with runner on 3B and <2 outs scores the runner
+  let finalOutcome: string = descriptiveOutcome;
+  if (outcome === 'Out' && /^Flyout to [A-Z0-9]+$/.test(descriptiveOutcome) && state.bases[2] && state.outs < 2) {
+    state.bases[2] = null;
+    state.score[teamIndex] += 1;
+    finalOutcome = descriptiveOutcome.replace(/^Flyout/, 'Sacrifice fly');
+  }
+
   if (outcome === 'Out' || outcome === 'K') {
     state.outs++;
   } else if (outcome === 'BB' || outcome === 'HBP') {
@@ -472,7 +480,7 @@ export function simulateAtBat(
 
   return {
     batter_id: matchup.batter_id,
-    outcome: descriptiveOutcome,
+    outcome: finalOutcome,
     ...(fielder ? { fielder, fielderPosition } : {})
   };
 }
@@ -512,20 +520,33 @@ export function attemptSteal(
       description: `No runner on base ${fromBase} to steal from.`
     };
   }
-  // Default probabilities
+  // Default probabilities by base
   let successProb = base === 2 ? 0.6 : base === 3 ? 0.3 : 0.1;
 
-  // Use real stats if available
-  if (runner?.baserunning && catcher?.stats) {
-    // Use baserunning speed from normalized stats
-    const runnerSpeed = runner.baserunning.speed || 50; // fallback to average
-    const catcherArm = catcher.stats.armStrength || 50; // fallback to average
-    const runnerName = (runner as any).name || (runner as any).player_id || 'Unknown Runner';
-    const catcherName = (catcher as any).name || (catcher as any).player_id || 'Unknown Catcher';
-    console.log(`[STEAL ATTEMPT] Runner: ${runnerName} (speed: ${runnerSpeed}), Catcher: ${catcherName} (arm: ${catcherArm})`);
-    // Simple model: higher speed, higher chance; higher arm, lower chance
-    successProb = 0.5 + (runnerSpeed - catcherArm) / 200; // Range ~0.0-1.0
-    // Adjust for base difficulty
+  // Runner ability: use SB/(SB+CS) from Baseball Reference when available, else speed
+  const sb = (runner as any).stats?.sb ?? 0;
+  const cs = (runner as any).stats?.cs ?? 0;
+  const runnerStealRate = (sb + cs) > 0 ? sb / (sb + cs) : null;
+  const runnerSpeed = runner?.baserunning?.speed ?? 50;
+  const runnerAbility = runnerStealRate ?? runnerSpeed / 100;
+
+  // Catcher: use csPct (caught stealing %) from Baseball Reference when available
+  const catcherCsPct = catcher?.stats && typeof catcher.stats.csPct === 'number'
+    ? catcher.stats.csPct
+    : null;
+  const catcherArm = catcher?.stats?.armStrength ?? 50;
+
+  if (runnerStealRate !== null || catcherCsPct !== null || (catcher?.stats && catcherArm !== 50)) {
+    // Use stats-based model when we have data
+    if (catcherCsPct !== null) {
+      // successProb = runnerAbility * (1 - catcherCsPct) / league_avg_success
+      // League avg CS% ~25%, so avg success ~75%
+      successProb = runnerAbility * (1 - catcherCsPct) / 0.75;
+    } else {
+      // Fallback: speed vs arm (original formula)
+      successProb = 0.5 + (runnerSpeed - catcherArm) / 200;
+    }
+    // Adjust for base difficulty (2B easiest, 3B harder, home hardest)
     if (base === 3) successProb -= 0.2;
     if (base === 4) successProb -= 0.4;
     successProb = Math.max(0.05, Math.min(0.95, successProb));

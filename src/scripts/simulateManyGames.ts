@@ -71,6 +71,15 @@ async function simulateGame(homeFile: string, awayFile: string): Promise<{away: 
     
     // Check for inning/half-inning transitions
     if (state.outs >= 3) {
+      // Must check game end BEFORE transitioning (checkGameEnd expects outs===3)
+      const shouldEnd = checkGameEnd({
+        inning: state.inning,
+        top: state.top,
+        score: state.score as [number, number],
+        outs: state.outs
+      }, endGame);
+      if (shouldEnd) gameOver = true;
+
       state.bases = [null, null, null];
       state.outs = 0;
       if (state.top) {
@@ -86,16 +95,15 @@ async function simulateGame(homeFile: string, awayFile: string): Promise<{away: 
       console.log(`  At-bat ${atBatCount}: ${state.inning}${state.top ? 'T' : 'B'}, ${state.outs} outs, ${state.score[0]}-${state.score[1]}`);
     }
     
-    // Check for game end
-    const shouldEnd = checkGameEnd({
-      inning: state.inning,
-      top: state.top,
-      score: state.score as [number, number],
-      outs: state.outs
-    }, endGame);
-    
-    if (shouldEnd) {
-      gameOver = true;
+    // Check for game end (walk-off: home ahead during bottom half)
+    if (!gameOver) {
+      const shouldEnd = checkGameEnd({
+        inning: state.inning,
+        top: state.top,
+        score: state.score as [number, number],
+        outs: state.outs
+      }, endGame);
+      if (shouldEnd) gameOver = true;
     }
     
     // Add maximum inning limit for testing (15 innings)

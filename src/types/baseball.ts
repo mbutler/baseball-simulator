@@ -14,6 +14,8 @@ export interface NormalizedBatter {
     singles: number;
     doubles: number;
     triples: number;
+    sb?: number;
+    cs?: number;
   };
   rates: {
     kRate: number | null;

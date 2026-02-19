@@ -6,13 +6,19 @@
 import type { NormalizedBatter, NormalizedPitcher } from '../types/baseball.js';
 
 /**
- * Computes the average of two numbers.
- * @param a - First number
- * @param b - Second number
- * @returns The average of a and b
+ * Log5 formula: combines batter and pitcher rates using league average as baseline.
+ * P(matchup) = (P_b * P_p / P_L) / (P_b * P_p / P_L + (1-P_b)*(1-P_p)/(1-P_L))
+ * @param rateB - Batter's rate (e.g. K/PA)
+ * @param rateP - Pitcher's rate (e.g. K/TBF)
+ * @param rateL - League average rate
+ * @returns Matchup probability
  */
-function avg(a: number, b: number): number {
-    return (a + b) / 2;
+function log5(rateB: number, rateP: number, rateL: number): number {
+  if (rateL <= 0 || rateL >= 1) return (rateB + rateP) / 2; // fallback if invalid league
+  const num = (rateB * rateP) / rateL;
+  const den = (1 - rateB) * (1 - rateP) / (1 - rateL);
+  const p = num / (num + den);
+  return Math.max(0, Math.min(1, p));
 }
 
 export interface AtBatProbabilities {
@@ -39,6 +45,7 @@ function safeRate(rate: number | null | undefined, fallback: number): number {
 const LEAGUE_K_RATE = 0.22; // MLB average K/PA
 const LEAGUE_BB_RATE = 0.08; // MLB average BB/PA
 const LEAGUE_HR_RATE = 0.03; // MLB average HR/PA
+const LEAGUE_HBP_RATE = 0.01; // MLB average HBP/PA
 
 /**
  * Given a normalized batter and pitcher, compute the at-bat outcome probabilities.
@@ -73,26 +80,42 @@ export function getAtBatProbabilities(
   const doubles = Math.max(0, bStats.doubles ?? 0);
   const triples = Math.max(0, bStats.triples ?? 0);
 
-  // 1. Assign K, BB, HBP, HR rates (average of batter and pitcher)
-  let K = avg(kRateB, kRateP);
-  let BB = avg(bbRateB, bbRateP);
-  let HBP_rate = PA > 0 ? HBP / PA : 0.01;
-  let HR = avg(hrRateB, hrRateP);
+  // Pitcher HBP rate (from Baseball Reference)
+  const pStats = pitcher.stats || {};
+  const pitcherHBP = Math.max(0, pStats.HBP ?? 0);
+  const TBF = Math.max(1, pitcher.TBF || 1);
+  const hbpRateP = clamp01(pitcherHBP / TBF, 'pitcherHBP');
+  const hbpRateB = PA > 0 ? clamp01(HBP / PA, 'batterHBP') : LEAGUE_HBP_RATE;
+
+  // 1. Assign K, BB, HBP, HR rates using log5 (batter vs pitcher matchup)
+  let K = log5(kRateB, kRateP, LEAGUE_K_RATE);
+  let BB = log5(bbRateB, bbRateP, LEAGUE_BB_RATE);
+  let HBP_rate = log5(hbpRateB, hbpRateP, LEAGUE_HBP_RATE);
+  let HR = log5(hrRateB, hrRateP, LEAGUE_HR_RATE);
 
   // 2. Compute balls in play (BIP)
   let nonBIP = K + BB + HBP_rate + HR;
   let BIP = Math.max(0, 1 - nonBIP);
 
-  // 3. Use league BABIP to determine hits on BIP
-  // Use average of batter and pitcher BABIP, but clamp to [0.27, 0.33] for realism
-  let BABIP = Math.max(0.27, Math.min(0.33, avg(babipB, babipP)));
+  // 3. Use log5 for BABIP; clamp to [0.24, 0.36] for realism (wider than before)
+  let BABIP = Math.max(0.24, Math.min(0.36, log5(babipB, babipP, 0.29)));
   let hitsInPlay = BABIP * BIP;
   let outsInPlay = BIP - hitsInPlay;
 
-  // 4. Assign hit types using MLB splits (2023: 1B ~75%, 2B ~20%, 3B ~5% of non-HR hits)
-  const singleRate = 0.75;
-  const doubleRate = 0.20;
-  const tripleRate = 0.05;
+  // 4. Assign hit types: use batter-specific rates if available, else league defaults (75/20/5)
+  const totalNonHR = singles + doubles + triples;
+  let singleRate: number;
+  let doubleRate: number;
+  let tripleRate: number;
+  if (totalNonHR > 0) {
+    singleRate = singles / totalNonHR;
+    doubleRate = doubles / totalNonHR;
+    tripleRate = triples / totalNonHR;
+  } else {
+    singleRate = 0.75;
+    doubleRate = 0.20;
+    tripleRate = 0.05;
+  }
   let oneB = hitsInPlay * singleRate;
   let twoB = hitsInPlay * doubleRate;
   let threeB = hitsInPlay * tripleRate;
@@ -121,9 +144,10 @@ export function getAtBatProbabilities(
     threeB = hitsInPlay * tripleRate;
   }
 
-  // 5. Scale down non-out events if needed to ensure outs are at least 58%
+  // 5. Scale down non-out events if needed to ensure outs are at least 65%
+  // MLB 2024: ~70% of PA are outs (27 outs / ~38.5 PA per team per game)
   let nonOutSum = K + BB + HBP_rate + HR + oneB + twoB + threeB;
-  const minOutRate = 0.58; // 58% outs, 42% non-outs (more realistic offense)
+  const minOutRate = 0.65; // 65% outs, 35% non-outs (MLB-like, ~8.5 runs/game)
   if (nonOutSum > 1 - minOutRate) {
     const scale = (1 - minOutRate) / nonOutSum;
     K *= scale;

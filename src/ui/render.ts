@@ -12,32 +12,27 @@ export function renderLineups(home: any, away: any): void {
   if (!lineupsContainer) return;
   lineupsContainer.innerHTML = '';
   const makeTable = (team: any, label: string): string => {
-    if (!team) return `<div><strong>${label}:</strong> Not loaded</div>`;
+    if (!team) return `<div class="lineup-block"><div class="block-label">${label}</div><div class="pitcher-row">Not loaded</div></div>`;
     const batters = team.lineup || team.batters || [];
     const pitcher = team.pitcher || (team.pitchers && team.pitchers[0]) || { name: 'N/A' };
     return `
-      <div style="margin-bottom:1.5em;">
-        <strong>${label} Lineup</strong>
+      <div class="lineup-block">
+        <div class="block-label">${label}</div>
         <table class="lineup-table">
           <thead><tr><th>#</th><th>Name</th><th>BABIP</th></tr></thead>
           <tbody>
             ${(batters || []).slice(0, 9).map((b: any, i: number) => {
               const position = b.position ? convertPositionCode(b.position) : '';
               const babip = b.rates?.BABIP ? Number(b.rates.BABIP).toFixed(3) : '';
-              return `<tr><td>${i+1}</td><td>${b.name || ''}${position ? ` <span class='pos-label'>(${position})</span>` : ''}</td><td>${babip}</td></tr>`;
+              return `<tr><td>${i+1}</td><td>${b.name || ''}${position ? ` <span class="pos-label">(${position})</span>` : ''}</td><td>${babip}</td></tr>`;
             }).join('')}
           </tbody>
         </table>
-        <div><strong>Pitcher:</strong> ${pitcher.name}</div>
+        <div class="pitcher-row"><strong>Pitcher:</strong> ${pitcher.name}</div>
       </div>
     `;
   };
-  lineupsContainer.innerHTML = `
-    <div style="display:flex;gap:2em;flex-wrap:wrap;">
-      <div style="flex:1;min-width:250px;">${makeTable(home, 'Home')}</div>
-      <div style="flex:1;min-width:250px;">${makeTable(away, 'Away')}</div>
-    </div>
-  `;
+  lineupsContainer.innerHTML = `<div class="lineups-grid">${makeTable(home, 'Home')}${makeTable(away, 'Away')}</div>`;
 }
 
 // --- Render game state and current batter ---
@@ -73,11 +68,16 @@ export function renderGameState(
   const pitcher = (teamIndex === 0 ? homeRoster : awayRoster).pitcher;
   const basesStr = ['1B','2B','3B'].map((b,i) => state.bases[i] ? b : '').filter(Boolean).join(', ') || 'Empty';
   gameStateContainer.innerHTML = `
-    <div><strong>Inning:</strong> ${inning} (${top ? 'Top' : 'Bottom'})</div>
-    <div><strong>Outs:</strong> ${outs}</div>
-    <div><strong>Bases:</strong> ${basesStr}</div>
-    <div><strong>Score:</strong> Away ${score[0]} &ndash; Home ${score[1]}</div>
-    <div style="margin-top:1em;"><strong>At Bat:</strong> ${batter.name} (vs ${pitcher.name})</div>
+    <div class="game-state-grid">
+      <div class="game-state-item"><span class="label">Inning</span><span class="value">${inning} ${top ? 'Top' : 'Bot'}</span></div>
+      <div class="game-state-item"><span class="label">Outs</span><span class="value">${outs}</span></div>
+      <div class="game-state-item"><span class="label">Bases</span><span class="value">${basesStr}</span></div>
+      <div class="game-state-item"><span class="label">Score</span><span class="value">${score[0]} &ndash; ${score[1]}</span></div>
+    </div>
+    <div class="game-state-item at-bat">
+      <span class="label">At Bat</span>
+      <span class="value">${batter.name} <span class="text-muted">vs ${pitcher.name}</span></span>
+    </div>
   `;
 }
 
@@ -98,16 +98,16 @@ export function renderAllAtBatResults(atBatLog: any[]): void {
   for (const result of atBatLog) {
     if (result.inning !== lastInning || result.top !== lastTop) {
       const labelDiv = document.createElement('div');
-      labelDiv.style.marginTop = '1em';
-      labelDiv.style.fontWeight = 'bold';
-      labelDiv.textContent = `Inning ${result.inning} - ${result.top ? 'Top' : 'Bottom'}`;
+      labelDiv.className = 'inning-label';
+      labelDiv.textContent = `Inning ${result.inning} – ${result.top ? 'Top' : 'Bottom'}`;
       atbatResultContainer.appendChild(labelDiv);
       lastInning = result.inning;
       lastTop = result.top;
     }
     const basesStr = ['1B','2B','3B'].map((b: string, i: number) => result.bases[i] ? b : '').filter(Boolean).join(', ') || 'Empty';
     const div = document.createElement('div');
-    div.innerHTML = `<strong>${result.batterName}:</strong> ${result.outcome} <span style="color:#888">(Outs: ${result.outs}, Score: Away ${result.score[0]} – Home ${result.score[1]}, Bases: ${basesStr})</span>`;
+    div.className = 'atbat-entry';
+    div.innerHTML = `<strong>${result.batterName}</strong> ${result.outcome}<span class="meta"> · ${result.outs} out · ${result.score[0]}-${result.score[1]} · ${basesStr}</span>`;
     atbatResultContainer.appendChild(div);
   }
 }

@@ -33,6 +33,8 @@ interface NormalizedPlayer {
       singles: number;
       doubles: number;
       triples: number;
+      sb: number;
+      cs: number;
     };
     rates: {
       kRate: number | null;
@@ -217,6 +219,8 @@ function normalizeBattingStats(batters: any[]): any[] {
       const triples = batter.b_triples || 0;
       
       const singles = H - doubles - triples - HR;
+      const sb = batter.b_sb ?? 0;
+      const cs = batter.b_cs ?? 0;
       
       // Calculate rates
       const kRate = PA > 0 ? SO / PA : null;
@@ -232,7 +236,7 @@ function normalizeBattingStats(batters: any[]): any[] {
         name: batter.name_display,
         player_id: batter.name_display?.toLowerCase().replace(/[^a-z0-9]/g, '') || '',
         PA,
-        stats: { H, HR, BB, SO, SF, HBP, singles, doubles, triples },
+        stats: { H, HR, BB, SO, SF, HBP, singles, doubles, triples, sb, cs },
         rates: { kRate, bbRate, hrRate, BABIP },
         baserunning: { runsBaserunning, speed }
       };
