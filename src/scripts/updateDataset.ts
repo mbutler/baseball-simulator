@@ -112,6 +112,16 @@ const MLB_TEAMS = [
 ];
 
 /**
+ * Baseball Reference path segment for season pages. Differs from our canonical code in some cases
+ * (e.g. Athletics use /teams/OAK/ through 2025, then /teams/ATH/ from 2026 — OAK URLs 404 for new seasons).
+ */
+function brSeasonPageSlug(teamCode: string, year: string): string {
+  const y = parseInt(year, 10);
+  if (teamCode === 'OAK' && !Number.isNaN(y) && y >= 2026) return 'ATH';
+  return teamCode;
+}
+
+/**
  * Fetch HTML from Baseball Reference
  */
 async function fetchHtml(url: string): Promise<string> {
@@ -319,7 +329,8 @@ function normalizeFieldingStats(fielders: any[]): any[] {
  * Download HTML for a single team
  */
 async function downloadTeamHtml(teamCode: string, year: string): Promise<string> {
-  const url = `https://www.baseball-reference.com/teams/${teamCode}/${year}.shtml`;
+  const slug = brSeasonPageSlug(teamCode, year);
+  const url = `https://www.baseball-reference.com/teams/${slug}/${year}.shtml`;
   const outPath = path.resolve(dataDir, `${teamCode}-${year}.html`);
   
   console.log(`🌐 Fetching: ${url}`);
@@ -562,16 +573,16 @@ function main() {
   
   if (args.includes('--help') || args.includes('-h')) {
     console.log(`
-Usage: bun run src/scripts/updateDatasetMonolithic.ts [YEAR] [TEAMS...]
+Usage: bun run src/scripts/updateDataset.ts [YEAR] [TEAMS...]
 
 Arguments:
   YEAR    Year to fetch data for (default: 2025)
   TEAMS   Space-separated list of team codes (default: all MLB teams)
 
 Examples:
-  bun run src/scripts/updateDatasetMonolithic.ts                    # Update all teams for 2025
-  bun run src/scripts/updateDatasetMonolithic.ts 2024               # Update all teams for 2024
-  bun run src/scripts/updateDatasetMonolithic.ts 2025 CHC MIL       # Update only CHC and MIL for 2025
+  bun run src/scripts/updateDataset.ts                    # Update all teams for 2025
+  bun run src/scripts/updateDataset.ts 2024               # Update all teams for 2024
+  bun run src/scripts/updateDataset.ts 2026 OAK           # Athletics: uses ATH slug on Baseball Reference
 
 Team codes: ${MLB_TEAMS.join(', ')}
     `);
