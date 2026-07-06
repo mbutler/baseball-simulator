@@ -228,6 +228,88 @@
       color: var(--text);
     }
 
+    /* Baseball field */
+    .field-wrap {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 14px;
+    }
+
+    .field-wrap svg {
+      width: 100%;
+      max-width: 320px;
+      height: auto;
+      display: block;
+    }
+
+    .field-wrap .base-plate {
+      fill: #ffffff;
+      stroke: #b9b0a6;
+      stroke-width: 1.5;
+    }
+
+    .field-wrap .force-path {
+      stroke: #f59e0b;
+      stroke-width: 5;
+      stroke-linecap: round;
+      opacity: 0.9;
+    }
+
+    .field-wrap .base-plate.occupied {
+      fill: var(--accent);
+      stroke: var(--accent-hover);
+    }
+
+    .field-wrap .runner {
+      fill: var(--accent);
+      stroke: #ffffff;
+      stroke-width: 2;
+    }
+
+    .field-wrap .batter {
+      fill: var(--primary);
+      stroke: #ffffff;
+      stroke-width: 2;
+    }
+
+    .field-wrap .marker-label {
+      fill: #ffffff;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      text-anchor: middle;
+      dominant-baseline: central;
+      pointer-events: none;
+    }
+
+    .field-wrap .runner-name {
+      fill: var(--text);
+      font-family: inherit;
+      font-size: 10px;
+      font-weight: 600;
+      text-anchor: middle;
+    }
+
+    .field-wrap .out-dot {
+      fill: none;
+      stroke: var(--text-muted);
+      stroke-width: 1.5;
+    }
+
+    .field-wrap .out-dot.filled {
+      fill: var(--danger);
+      stroke: var(--danger);
+    }
+
+    .field-wrap .out-label {
+      fill: var(--text-muted);
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
     /* Game state card */
     .game-state {
       background: var(--surface-elevated);
@@ -592,6 +674,7 @@
 
     <section class="section" id="game-section">
       <h2 class="section-title">Game State</h2>
+      <div class="field-wrap" id="field-container"></div>
       <div class="game-state" id="game-state-container"></div>
     </section>
 

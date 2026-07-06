@@ -35,13 +35,17 @@ const makePitcher = (overrides: Record<string, any> = {}) => ({
 })
 
 describe('Log5 formula', () => {
-  test('league-average batter vs league-average pitcher produces scaled K rate (minOutRate 65%)', () => {
+  test('league-average batter vs league-average pitcher produces ~league-average K rate', () => {
     const batter = makeBatter({ rates: { kRate: 0.22, bbRate: 0.08, hrRate: 0.03, BABIP: 0.29 } })
     const pitcher = makePitcher({ rates: { kRate: 0.22, bbRate: 0.08, hrRate: 0.03, BABIP: 0.29 } })
     const probs = getAtBatProbabilities(batter, pitcher)
-    // minOutRate scales non-out events; K should be ~10-16% after scaling
-    expect(probs.K).toBeGreaterThan(0.08)
-    expect(probs.K).toBeLessThan(0.20)
+    // Strikeouts are outs and are no longer scaled down, so a league-average
+    // matchup should land near the true ~22% K rate.
+    expect(probs.K).toBeGreaterThan(0.18)
+    expect(probs.K).toBeLessThan(0.26)
+    // Total out rate (batted-ball outs + strikeouts) should be MLB-realistic.
+    expect(probs.Out + probs.K).toBeGreaterThan(0.60)
+    expect(probs.Out + probs.K).toBeLessThan(0.72)
   })
 
   test('high-K batter vs high-K pitcher produces higher K than league average', () => {

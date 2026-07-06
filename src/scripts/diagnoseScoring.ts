@@ -43,9 +43,10 @@ async function main() {
     const batter = awayRoster.lineup[i];
     const pitcher = homeRoster.pitcher;
     const probs = getAtBatProbabilities(batter, pitcher);
-    const outRate = probs.K + probs.BB + probs.HBP + probs.Out;
-    const reachRate = 1 - probs.Out;
-    console.log(`  ${batter.name}: Out=${(probs.Out * 100).toFixed(1)}% K=${(probs.K * 100).toFixed(1)}% Reach=${(reachRate * 100).toFixed(1)}%`);
+    // Strikeouts are outs; reaching base = BB + HBP + HR + 1B + 2B + 3B.
+    const outRate = probs.Out + probs.K;
+    const reachRate = probs.BB + probs.HBP + probs.HR + probs['1B'] + probs['2B'] + probs['3B'];
+    console.log(`  ${batter.name}: Out=${(outRate * 100).toFixed(1)}% (K=${(probs.K * 100).toFixed(1)}%) Reach=${(reachRate * 100).toFixed(1)}%`);
   }
 
   // --- MLB baselines (2024) ---

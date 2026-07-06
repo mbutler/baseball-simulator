@@ -70,16 +70,20 @@ describe('Probability Model Debug', () => {
     console.log('3B rate:', probabilities['3B'])
     console.log('Out rate:', probabilities.Out)
     
-    // With minOutRate 0.65, Out is scaled to 65%; other rates scale down proportionally
+    // Strikeouts count as outs and are not scaled; only reach-base events are
+    // capped. So K stays near its true rate, batted-ball Out is the remainder,
+    // and total outs (Out + K) should be MLB-realistic (~63-68%).
     expect(total).toBeCloseTo(1.0, 2) // Should sum to 1.0
-    expect(probabilities.K).toBeGreaterThan(0.08) // Scaled from raw ~20%
-    expect(probabilities.K).toBeLessThan(0.20)
+    expect(probabilities.K).toBeGreaterThan(0.14) // near true log5 ~18%
+    expect(probabilities.K).toBeLessThan(0.22)
     expect(probabilities.BB).toBeGreaterThan(0.04)
-    expect(probabilities.BB).toBeLessThan(0.12)
+    expect(probabilities.BB).toBeLessThan(0.16)
     expect(probabilities.HR).toBeGreaterThan(0.01)
     expect(probabilities.HR).toBeLessThan(0.05)
-    expect(probabilities.Out).toBeGreaterThan(0.62) // minOutRate 65%
-    expect(probabilities.Out).toBeLessThan(0.70)
+    expect(probabilities.Out).toBeGreaterThan(0.38) // batted-ball outs only
+    expect(probabilities.Out).toBeLessThan(0.55)
+    expect(probabilities.Out + probabilities.K).toBeGreaterThan(0.60) // total outs
+    expect(probabilities.Out + probabilities.K).toBeLessThan(0.72)
   })
 
   test('check extreme cases', () => {

@@ -130,7 +130,7 @@ function advanceRunners(bases: (BasePlayer | null)[], outcome: string, batter: B
     if (!bases[i]) continue;
     
     const runner = bases[i]!; // Non-null assertion since we just checked
-    const runnerSpeed = runner.baserunning?.speed || 50; // Default to average speed
+    const runnerSpeed = Math.max(0, Math.min(100, runner.baserunning?.speed ?? 50)); // Default to average speed
     const runnerBaserunningValue = runner.baserunning?.runsBaserunning || 0; // Baserunning skill
     
     // Enhanced: Use baserunning stats to determine advancement
@@ -527,7 +527,7 @@ export function attemptSteal(
   const sb = (runner as any).stats?.sb ?? 0;
   const cs = (runner as any).stats?.cs ?? 0;
   const runnerStealRate = (sb + cs) > 0 ? sb / (sb + cs) : null;
-  const runnerSpeed = runner?.baserunning?.speed ?? 50;
+  const runnerSpeed = Math.max(0, Math.min(100, runner?.baserunning?.speed ?? 50));
   const runnerAbility = runnerStealRate ?? runnerSpeed / 100;
 
   // Catcher: use csPct (caught stealing %) from Baseball Reference when available
@@ -623,7 +623,7 @@ export function attemptPickoff(
   if (pitcher?.stats && runner?.baserunning) {
     // Use pitcher pickoff stats and runner speed
     const pitcherPick = pitcher.stats.pickoffs || 0; // Number of pickoffs
-    const runnerSpeed = runner.baserunning.speed || 50; // Runner speed rating
+    const runnerSpeed = Math.max(0, Math.min(100, runner.baserunning.speed ?? 50)); // Runner speed rating
     
     // Convert pickoff count to probability (more pickoffs = higher chance)
     pickoffProb = 0.03 + (pitcherPick * 0.02) - (runnerSpeed - 50) / 1000;

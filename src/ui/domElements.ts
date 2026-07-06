@@ -6,6 +6,7 @@ export const loadTeamsBtn = document.getElementById('load-teams-btn') as HTMLBut
 export const statusDiv = document.getElementById('status') as HTMLDivElement | null;
 export const lineupsContainer = document.getElementById('lineups-container') as HTMLDivElement | null;
 export const gameStateContainer = document.getElementById('game-state-container') as HTMLDivElement | null;
+export const fieldContainer = document.getElementById('field-container') as HTMLDivElement | null;
 export const nextAtBatBtn = document.getElementById('next-atbat-btn') as HTMLButtonElement | null;
 export const atbatResultContainer = document.getElementById('atbat-result-container') as HTMLDivElement | null;
 export const customizeHomeBtn = document.getElementById('customize-home-lineup-btn') as HTMLButtonElement | null;

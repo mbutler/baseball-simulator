@@ -97,8 +97,9 @@ export function getAtBatProbabilities(
   let nonBIP = K + BB + HBP_rate + HR;
   let BIP = Math.max(0, 1 - nonBIP);
 
-  // 3. Use log5 for BABIP; clamp to [0.24, 0.36] for realism (wider than before)
-  let BABIP = Math.max(0.24, Math.min(0.36, log5(babipB, babipP, 0.29)));
+  // 3. Use log5 for BABIP; clamp to [0.24, 0.40] to keep results realistic while
+  // still allowing meaningful separation between contact-quality profiles.
+  let BABIP = Math.max(0.24, Math.min(0.40, log5(babipB, babipP, 0.29)));
   let hitsInPlay = BABIP * BIP;
   let outsInPlay = BIP - hitsInPlay;
 
@@ -122,44 +123,49 @@ export function getAtBatProbabilities(
 
   // --- Situational Adjustments ---
   if (situation) {
-    // RISP: boost BABIP and doubles
-    if (situation.risp) {
-      BABIP += 0.01; // +10 points
-      twoB *= 1.10; // +10% more doubles
-    }
-    // Late & Close: boost BB and K rates
-    if (situation.late) {
-      BB *= 1.10;
-      K *= 1.05;
-    }
-    // Two outs: slightly reduce BABIP
-    if (situation.twoOuts) {
-      BABIP -= 0.01; // -10 points
-    }
-    // Recompute hitsInPlay and outsInPlay after BABIP changes
+    // RISP: slightly higher BABIP. Late & Close: more walks and strikeouts.
+    // Two outs: slightly lower BABIP.
+    if (situation.risp) BABIP += 0.01; // +10 points of BABIP
+    if (situation.late) { BB *= 1.10; K *= 1.05; }
+    if (situation.twoOuts) BABIP -= 0.01; // -10 points of BABIP
+
+    // Recompute hits after BABIP changes.
     hitsInPlay = Math.max(0, Math.min(1, BABIP)) * BIP;
     outsInPlay = BIP - hitsInPlay;
     oneB = hitsInPlay * singleRate;
     twoB = hitsInPlay * doubleRate;
     threeB = hitsInPlay * tripleRate;
+
+    // RISP doubles bump: shift a little single share into doubles AFTER the
+    // recompute above (previously this was overwritten and had no effect).
+    // Keeping total hits constant so it doesn't inflate the run environment.
+    if (situation.risp) {
+      const boost = twoB * 0.10;
+      twoB += boost;
+      oneB = Math.max(0, oneB - boost);
+    }
   }
 
-  // 5. Scale down non-out events if needed to ensure outs are at least 65%
-  // MLB 2024: ~70% of PA are outs (27 outs / ~38.5 PA per team per game)
-  let nonOutSum = K + BB + HBP_rate + HR + oneB + twoB + threeB;
-  const minOutRate = 0.65; // 65% outs, 35% non-outs (MLB-like, ~8.5 runs/game)
-  if (nonOutSum > 1 - minOutRate) {
-    const scale = (1 - minOutRate) / nonOutSum;
-    K *= scale;
+  // 5. Cap the reach-base rate so the total out rate stays MLB-realistic.
+  // IMPORTANT: strikeouts are OUTS, so they are NOT part of the reach bucket.
+  // Only on-base/scoring events (BB, HBP, HR, 1B, 2B, 3B) are scaled; batted-ball
+  // outs then absorb whatever is left after K and reach events. This keeps total
+  // outs (K + Out) near the MLB ~68% and preserves separation between hitters.
+  // MLB 2024: OBP ~.315, so reach ~32% and outs ~68% of PA.
+  const maxReachRate = 0.38; // cap on combined BB+HBP+HR+1B+2B+3B
+  let reachSum = BB + HBP_rate + HR + oneB + twoB + threeB;
+  if (reachSum > maxReachRate) {
+    const scale = maxReachRate / reachSum;
     BB *= scale;
     HBP_rate *= scale;
     HR *= scale;
     oneB *= scale;
     twoB *= scale;
     threeB *= scale;
-    // Recompute outs
-    outsInPlay = 1 - (K + BB + HBP_rate + HR + oneB + twoB + threeB);
+    reachSum = maxReachRate;
   }
+  // Batted-ball outs are the remainder after strikeouts and reach events.
+  outsInPlay = Math.max(0, 1 - K - reachSum);
 
   // 6. Clamp and normalize
   let result: AtBatProbabilities = {

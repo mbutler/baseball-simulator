@@ -239,8 +239,12 @@ function normalizeBattingStats(batters: any[]): any[] {
       const BABIP = (PA - BB - SO - HR - SF) > 0 ? (H - HR) / (PA - BB - SO - HR - SF) : null;
       
       // Baserunning stats (simplified)
-      const runsBaserunning = batter.b_runs_baserunning || null;
-      const speed = runsBaserunning ? 50 + runsBaserunning * 10 : null;
+      const runsBaserunning = batter.b_runs_baserunning ?? null;
+      // Map baserunning runs to a 0-100 speed rating centered on 50 (league avg),
+      // clamped so extreme values can't produce 0/negative or >100 ratings.
+      const speed = runsBaserunning != null
+        ? Math.max(0, Math.min(100, 50 + runsBaserunning * 10))
+        : null;
       
       return {
         name: batter.name_display,
