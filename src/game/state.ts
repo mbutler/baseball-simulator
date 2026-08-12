@@ -22,6 +22,9 @@ export interface AtBatLogEntry {
 export const gameStore = {
   loadedHome: null as LoadedTeam | null,
   loadedAway: null as LoadedTeam | null,
+  // Dataset codes ("CHC-2026") for the teams currently loaded, for labelling.
+  homeTeamCode: null as string | null,
+  awayTeamCode: null as string | null,
   homeRoster: null as Roster | null,
   awayRoster: null as Roster | null,
   homeFielders: null as any[] | null,
@@ -42,6 +45,8 @@ export const gameStore = {
 export function resetGameState() {
   gameStore.loadedHome = null;
   gameStore.loadedAway = null;
+  gameStore.homeTeamCode = null;
+  gameStore.awayTeamCode = null;
   gameStore.homeRoster = null;
   gameStore.awayRoster = null;
   gameStore.homeFielders = null;

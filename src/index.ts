@@ -5,6 +5,7 @@ import { buildRoster } from './core/rosterBuilder.js';
 import { prepareMatchups, type Roster } from './core/matchupPreparer.js';
 import { initGameState, simulateAtBat, attemptSteal, attemptPickoff, type GameState } from './core/gameEngine.js';
 import { checkGameEnd } from './core/gameEndLogic.js';
+import { formatPlayerName } from './utils/playerName.js';
 import {
   homeSelect,
   awaySelect,
@@ -36,7 +37,8 @@ import {
   renderGameState,
   renderAtBatResult,
   renderAllAtBatResults,
-  renderGameStateWithButtons
+  renderGameStateWithButtons,
+  withLatestPlayInView
 } from './ui/render';
 import {
   gameStore,
@@ -84,12 +86,14 @@ function endGame(winner: 'Home' | 'Away', score: number[], inning: number, lastW
     statusDiv.textContent = `Game Over: ${winner} wins! Final Score: Away ${score[0]} – Home ${score[1]} (${inning}${lastWasTop ? ' Top' : ' Bottom'})`;
   }
   if (atbatResultContainer) {
-    const div = document.createElement('div');
-    div.style.marginTop = '1em';
-    div.style.fontWeight = 'bold';
-    div.style.color = '#b00';
-    div.textContent = `Game Over: ${winner} wins! Final Score: Away ${score[0]} – Home ${score[1]} (${inning}${lastWasTop ? ' Top' : ' Bottom'})`;
-    atbatResultContainer.appendChild(div);
+    withLatestPlayInView(() => {
+      const div = document.createElement('div');
+      div.style.marginTop = '1em';
+      div.style.fontWeight = 'bold';
+      div.style.color = '#b00';
+      div.textContent = `Game Over: ${winner} wins! Final Score: Away ${score[0]} – Home ${score[1]} (${inning}${lastWasTop ? ' Top' : ' Bottom'})`;
+      atbatResultContainer!.appendChild(div);
+    });
   }
 }
 
@@ -274,6 +278,8 @@ async function loadAndDisplayLineups(): Promise<void> {
     ]);
     gameStore.loadedHome = home;
     gameStore.loadedAway = away;
+    gameStore.homeTeamCode = homeFile;
+    gameStore.awayTeamCode = awayFile;
     gameStore.homeFielders = home.fielders;
     gameStore.awayFielders = away.fielders;
     // Merge batting and fielding data for each batter (home)
@@ -310,7 +316,7 @@ async function loadAndDisplayLineups(): Promise<void> {
         )
       : null;
     // Render the actual lineups that will be used in the game
-    renderLineups(gameStore.homeRoster, gameStore.awayRoster);
+    renderLineups(gameStore.homeRoster, gameStore.awayRoster, gameStore.homeTeamCode, gameStore.awayTeamCode);
     // Reset persistent at-bat log
     gameStore.atBatLog = [];
     renderAllAtBatResults(gameStore.atBatLog);
@@ -458,7 +464,7 @@ function updateRostersWithNewLineups(): void {
   }
   
   // Update the display
-  renderLineups(gameStore.homeRoster, gameStore.awayRoster);
+  renderLineups(gameStore.homeRoster, gameStore.awayRoster, gameStore.homeTeamCode, gameStore.awayTeamCode);
   renderGameState(gameStore.gameState, gameStore.homeRoster, gameStore.awayRoster, gameStore.homeMatchups, gameStore.awayMatchups, gameStore.lastRenderedInning, gameStore.lastRenderedTop);
 }
 
@@ -495,7 +501,7 @@ function showLineupModal(team: 'home' | 'away', batters: NormalizedBatter[], pit
     select.name = `batter${i}`;
     select.required = true;
     select.innerHTML = '<option value="">-- Select --</option>' +
-      batters.map(b => `<option value="${b.player_id}">${b.name} (${b.PA} PA)</option>`).join('');
+      batters.map(b => `<option value="${b.player_id}">${formatPlayerName(b.name)} (${b.PA} PA)</option>`).join('');
     if (effectiveLineup && effectiveLineup[i]) select.value = effectiveLineup[i];
     li.appendChild(select);
     battingOrderList.appendChild(li);
@@ -503,7 +509,7 @@ function showLineupModal(team: 'home' | 'away', batters: NormalizedBatter[], pit
 
   // Pitcher dropdown
   pitcherSelect.innerHTML = '<option value="">-- Select --</option>' +
-    pitchers.filter(p => p.name && p.name !== 'Player' && p.name !== 'Pitcher').map(p => `<option value="${p.player_id}">${p.name} (${p.stats && p.stats.IP ? p.stats.IP : ''} IP)</option>`).join('');
+    pitchers.filter(p => p.name && p.name !== 'Player' && p.name !== 'Pitcher').map(p => `<option value="${p.player_id}">${formatPlayerName(p.name)} (${p.stats && p.stats.IP ? p.stats.IP : ''} IP)</option>`).join('');
   if (effectivePitcher) pitcherSelect.value = effectivePitcher;
 }
 

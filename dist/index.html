@@ -66,14 +66,20 @@
     /* Compact controls row */
     .controls {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
       gap: 8px;
-      align-items: center;
       background: var(--surface);
       padding: 12px 14px;
       border-radius: var(--radius-md);
       box-shadow: var(--shadow-sm);
       border: 1px solid var(--border);
+    }
+
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
     }
 
     .controls .team-group {
@@ -180,11 +186,23 @@
       min-width: 0;
     }
 
+    .lineup-heading {
+      margin-bottom: 8px;
+    }
+
     .lineup-block .block-label {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       color: var(--text-muted);
-      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .lineup-block .team-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.3;
     }
 
     .lineup-table {
@@ -237,7 +255,7 @@
 
     .field-wrap svg {
       width: 100%;
-      max-width: 320px;
+      max-width: 440px;
       height: auto;
       display: block;
     }
@@ -245,12 +263,23 @@
     .field-wrap .base-plate {
       fill: #ffffff;
       stroke: #b9b0a6;
-      stroke-width: 1.5;
+      stroke-width: 0.6;
+    }
+
+    .field-wrap .chalk {
+      stroke: #ffffff;
+      stroke-width: 1.6;
+    }
+
+    .field-wrap .chalk-box {
+      fill: none;
+      stroke: #ffffff;
+      stroke-width: 1.2;
     }
 
     .field-wrap .force-path {
       stroke: #f59e0b;
-      stroke-width: 5;
+      stroke-width: 3.5;
       stroke-linecap: round;
       opacity: 0.9;
     }
@@ -263,19 +292,19 @@
     .field-wrap .runner {
       fill: var(--accent);
       stroke: #ffffff;
-      stroke-width: 2;
+      stroke-width: 1.75;
     }
 
     .field-wrap .batter {
       fill: var(--primary);
       stroke: #ffffff;
-      stroke-width: 2;
+      stroke-width: 1.75;
     }
 
     .field-wrap .marker-label {
       fill: #ffffff;
       font-family: inherit;
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 700;
       text-anchor: middle;
       dominant-baseline: central;
@@ -285,9 +314,13 @@
     .field-wrap .runner-name {
       fill: var(--text);
       font-family: inherit;
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 600;
       text-anchor: middle;
+      paint-order: stroke;
+      stroke: #ffffff;
+      stroke-width: 2.5px;
+      stroke-linejoin: round;
     }
 
     .field-wrap .out-dot {
@@ -613,7 +646,7 @@
         padding-bottom: 150px;
       }
 
-      .controls {
+      .controls-row {
         flex-direction: column;
         align-items: stretch;
       }
@@ -652,17 +685,21 @@
     </header>
 
     <div class="controls">
-      <div class="team-group">
-        <label for="home-team-select">Home</label>
-        <select id="home-team-select"></select>
+      <div class="controls-row">
+        <div class="team-group">
+          <label for="home-team-select">Home</label>
+          <select id="home-team-select"></select>
+        </div>
+        <div class="team-group">
+          <label for="away-team-select">Away</label>
+          <select id="away-team-select"></select>
+        </div>
+        <button id="load-teams-btn" class="btn btn-primary">New Game</button>
       </div>
-      <div class="team-group">
-        <label for="away-team-select">Away</label>
-        <select id="away-team-select"></select>
+      <div class="controls-row">
+        <button id="customize-home-lineup-btn" class="btn btn-ghost">Home Lineup</button>
+        <button id="customize-away-lineup-btn" class="btn btn-ghost">Away Lineup</button>
       </div>
-      <button id="load-teams-btn" class="btn btn-primary">New Game</button>
-      <button id="customize-home-lineup-btn" class="btn btn-ghost">Home Lineup</button>
-      <button id="customize-away-lineup-btn" class="btn btn-ghost">Away Lineup</button>
     </div>
 
     <div id="status"></div>
