@@ -13,7 +13,7 @@ import type { NormalizedBatter, NormalizedPitcher } from '../types/baseball.js';
  * @param rateL - League average rate
  * @returns Matchup probability
  */
-function log5(rateB: number, rateP: number, rateL: number): number {
+export function log5(rateB: number, rateP: number, rateL: number): number {
   if (rateL <= 0 || rateL >= 1) return (rateB + rateP) / 2; // fallback if invalid league
   const num = (rateB * rateP) / rateL;
   const den = (1 - rateB) * (1 - rateP) / (1 - rateL);

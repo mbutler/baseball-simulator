@@ -1,1 +1,14 @@
 node_modules/
+
+# Scraped Baseball Reference pages: verbatim third-party content (Sports Reference's
+# property, non-commercial use only), so not redistributed here. Regenerate with
+# `bun run update-dataset <year>`. Nothing reads these once complete-dataset-<year>.json
+# has been parsed out of them.
+dist/data/*.html
+
+# Chadwick crosswalk re-downloads in seconds.
+dist/data/statcast/chadwick-mlbam.csv
+
+# Derived data IS committed on purpose — dist/complete-dataset-*.json,
+# dist/count-profiles-*.json, and dist/data/statcast/pa-*.csv — so a clone on another
+# machine can pick the work up without re-scraping or re-fetching a season.
