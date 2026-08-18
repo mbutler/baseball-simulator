@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import { JSDOM } from 'jsdom';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -113,32 +113,64 @@ const MLB_TEAMS = [
 
 /**
  * Baseball Reference path segment for season pages. Differs from our canonical code in some cases
- * (e.g. Athletics use /teams/OAK/ through 2025, then /teams/ATH/ from 2026 — OAK URLs 404 for new seasons).
+ * (e.g. the Athletics dropped "Oakland" for 2025, so BR serves them at /teams/ATH/ from 2025 on.
+ * /teams/OAK/2025.shtml still returns 200 with the right <title>, but it is a stub with no stat tables.)
  */
 function brSeasonPageSlug(teamCode: string, year: string): string {
   const y = parseInt(year, 10);
-  if (teamCode === 'OAK' && !Number.isNaN(y) && y >= 2026) return 'ATH';
+  if (teamCode === 'OAK' && !Number.isNaN(y) && y >= 2025) return 'ATH';
   return teamCode;
 }
 
 /**
  * Fetch HTML from Baseball Reference
  */
-async function fetchHtml(url: string): Promise<string> {
+async function fetchHtml(url: string, attempts = 4): Promise<string> {
   if (!url.startsWith('https://www.baseball-reference.com/teams/')) {
     throw new Error(`Invalid team URL: ${url}`);
   }
 
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Fetch failed with status ${response.status} (${response.statusText})`);
+  let lastErr = '';
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'baseball-simulator/1.0 (personal, non-commercial)' }
+      });
+      if (!response.ok) {
+        throw new Error(`status ${response.status} (${response.statusText})`);
+      }
+      const html = await response.text();
+      const missing = missingTableMarkers(html);
+      if (missing.length === 0) return html;
+      // Baseball Reference sometimes returns a throttled/truncated page that still
+      // has status 200 and the right <title>. Treat that as a retryable failure
+      // instead of silently parsing zero players out of it.
+      throw new Error(`incomplete page (${html.length} bytes, missing ${missing.join(', ')})`);
+    } catch (err) {
+      lastErr = (err && typeof err === 'object' && 'message' in err) ? (err as Error).message : String(err);
+      if (attempt < attempts) {
+        const waitMs = 2000 * 2 ** (attempt - 1); // 2s, 4s, 8s
+        console.warn(`   ⚠️  attempt ${attempt}/${attempts} failed: ${lastErr} — retrying in ${waitMs / 1000}s`);
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+      }
     }
-    return await response.text();
-  } catch (err) {
-    const msg = (err && typeof err === 'object' && 'message' in err) ? (err as Error).message : String(err);
-    throw new Error(`Failed to fetch team page: ${msg}`);
   }
+  throw new Error(`Failed to fetch team page after ${attempts} attempts: ${lastErr}`);
+}
+
+/** Table ids every complete Baseball Reference team season page contains. */
+const REQUIRED_TABLE_MARKERS = [
+  'players_standard_batting',
+  'players_standard_pitching',
+  'players_standard_fielding'
+];
+
+/**
+ * Return the required table markers absent from a fetched page. A complete page
+ * returns []; a throttled or truncated one is missing all three.
+ */
+function missingTableMarkers(html: string): string[] {
+  return REQUIRED_TABLE_MARKERS.filter(marker => !html.includes(marker));
 }
 
 /**
@@ -528,6 +560,9 @@ async function updateDataset(year: string = '2025', teams?: string[]) {
       
       // Process and normalize data
       const teamData = processTeamHtml(html, teamCode, year);
+      if (teamData.players.length === 0) {
+        throw new Error('parsed 0 players from a page that passed the table check');
+      }
       processedTeams.push(teamData);
       
       console.log(`✅ ${teamCode}: ${teamData.players.length} players`);
@@ -542,13 +577,38 @@ async function updateDataset(year: string = '2025', teams?: string[]) {
     }
   }
   
+  // When only some teams were requested, merge them into the existing file
+  // instead of replacing it — otherwise a single-team refresh silently drops
+  // the other 29 teams.
+  let teamsForOutput = processedTeams;
+  if (teams && teams.length > 0) {
+    let existing: TeamData[] = [];
+    try {
+      const prior = JSON.parse(await readFile(outputFile, 'utf-8')) as CompleteDataset;
+      existing = prior.teams ?? [];
+      console.log(`\n🔀 Merging ${processedTeams.length} refreshed team(s) into ${existing.length} existing`);
+    } catch {
+      console.warn(`\n⚠️  No readable existing dataset at ${outputFile}; writing only the refreshed teams`);
+    }
+    const refreshed = new Map(processedTeams.map(t => [t.team, t]));
+    teamsForOutput = existing.map(t => refreshed.get(t.team) ?? t);
+    for (const [code, t] of refreshed) {
+      if (!teamsForOutput.some(x => x.team === code)) teamsForOutput.push(t);
+    }
+    teamsForOutput.sort((a, b) => a.team.localeCompare(b.team));
+  }
+
+  if (teamsForOutput.length === 0) {
+    throw new Error('Refusing to write an empty dataset: no teams were processed successfully');
+  }
+
   // Generate metadata
-  const metadata = generateMetadata(processedTeams);
+  const metadata = generateMetadata(teamsForOutput);
   
   // Create complete dataset
   const dataset: CompleteDataset = {
     metadata,
-    teams: processedTeams
+    teams: teamsForOutput
   };
   
   // Write to file
@@ -565,9 +625,17 @@ async function updateDataset(year: string = '2025', teams?: string[]) {
   console.log(`   Fielders: ${metadata.totalFielders}`);
   console.log(`   File Size: ${(JSON.stringify(dataset).length / 1024 / 1024).toFixed(2)} MB`);
   
+  const empties = teamsForOutput.filter(t => t.players.length === 0).map(t => t.team);
+  if (empties.length > 0) {
+    console.error(`\n❌ Teams with 0 players in the written dataset: ${empties.join(', ')}`);
+  }
+
   if (errors.length > 0) {
     console.log(`\n⚠️ Errors encountered:`);
     errors.forEach(error => console.log(`   ${error}`));
+  }
+  if (errors.length > 0 || empties.length > 0) {
+    process.exitCode = 1;
   }
 }
 

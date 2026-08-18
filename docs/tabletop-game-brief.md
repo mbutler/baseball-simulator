@@ -1,5 +1,11 @@
 # Tabletop baseball brief
 
+> **Status note (2026-08-18).** The working design in §6 has been superseded by the
+> count-based two-roll design in [`count-game-design.md`](./count-game-design.md), which is
+> grounded in real Statcast pitch data. §5 (what not to clone), §8 (constraints and taste),
+> and §10 (glossary) are unchanged and still authoritative. Figures in §2 and §4 below were
+> computed **before** the Athletics data bug was fixed — see the inline notes.
+
 A handoff for another designer/agent. This repo is a **digital MLB at-bat simulator**. The owner also plays Strat-O-Matic and wants to explore a **dice/tabletop game** that uses this data and model, feels like baseball, feels *new* relative to Strat/APBA, and grows by **optional modules** rather than a thick rulebook.
 
 The likely implementation path is: **this app generates cards** (and maybe park/module sheets) from the same probability engine. Other physicalizations are still in play.
@@ -42,7 +48,10 @@ The digital sim is considered **good enough** for run environment and event rate
 
 ## 2. Data we have
 
-One JSON blob of **30 teams**, **~1,720 players** for 2025.
+One JSON blob of **30 teams**, **1,781 players** for 2025.
+
+> Was ~1,720 until 2026-08-18, when the Athletics were found missing entirely from the
+> dataset (empty roster, no error). Fixed — see §6 of the count-game design doc.
 
 Each team: `team`, `year`, `players[]`. A player may have batting, pitching, and/or fielding.
 
@@ -137,6 +146,8 @@ GDP (grounder + force, ~25%+ by range), rare triple play, ROE, sac fly (fly + ru
 
 On **2025 full-season data**, 10 matchups × 400 games (**4,000 games**):
 
+> ⚠️ These were run on the dataset **without the Athletics**. Regenerate now that OAK exists.
+
 | Rate | Sim | 2025 MLB |
 |---|---|---|
 | Runs / team / game | 4.71 | 4.45 |
@@ -165,7 +176,14 @@ Matchups spread like real teams (e.g. DET @ TEX ~3.4 R/G and 29% K; ARI @ SDP ~5
 
 ---
 
-## 6. Ideas we’ve liked (working design)
+## 6. Ideas we’ve liked (working design — SUPERSEDED)
+
+> **Superseded by [`count-game-design.md`](./count-game-design.md).** The two-roll face-off
+> below was the right instinct but structurally too close to Strat, and neither player made a
+> decision. The replacement keeps the simultaneous roll and the cup, but roll 1 now resolves
+> the **count**, not the outcome. The module ideas in this section survive intact and get
+> better — read them, then read the new doc. Retained here for the reasoning and the
+> Hoerner/Peralta worked example.
 
 ### Core loop — two questions, two dice, face-off
 
@@ -257,7 +275,10 @@ The existing browser app is a natural place to pick lineups, then “Print cards
 
 ---
 
-## 9. Suggested next experiments (for the receiving agent)
+## 9. Suggested next experiments (for the receiving agent — SEE NEW DOC)
+
+> Items 1 and 3 below are reframed by the count design; the current task list lives in
+> §7 of [`count-game-design.md`](./count-game-design.md). Items 2, 4, and 5 still apply as written.
 
 1. Specify exact d20 or 2d10 mappings for Pitch and Contact from `getAtBatProbabilities`, with HR on Contact only.  
 2. Prototype 9 Cubs batters + Peralta/Boyd pitch cards; play three innings on paper.  
