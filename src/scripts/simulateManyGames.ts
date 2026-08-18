@@ -42,8 +42,8 @@ async function simulateGame(homeFile: string, awayFile: string): Promise<{away: 
     away.pitchers
   );
   // Prepare matchups
-  const homeMatchups = prepareMatchups(homeRoster);
-  const awayMatchups = prepareMatchups(awayRoster);
+  const homeMatchups = prepareMatchups(homeRoster, awayRoster);
+  const awayMatchups = prepareMatchups(awayRoster, homeRoster);
   // Init game state
   const state = initGameState();
   // Simulate game

@@ -63,7 +63,8 @@ export function convertPositionCode(positionCode: string): string {
   if (!positionCode || typeof positionCode !== 'string') return '';
   
   // Remove any asterisks and split by common delimiters
-  const cleanCode = positionCode.replace(/\*/g, '').split(/[/,]/)[0];
+  const tokens = positionCode.replace(/\*/g, '').split(/[/,]/).filter(Boolean);
+  const cleanCode = tokens[0] || '';
   
   // Baseball Reference position codes:
   // 1 = Pitcher, 2 = Catcher, 3 = First Base, 4 = Second Base, 5 = Third Base

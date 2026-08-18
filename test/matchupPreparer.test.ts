@@ -42,6 +42,19 @@ function runTests(): void {
   assertEqual(matchups[1].batter_id, 'b2', 'Second matchup has correct batter');
   assertEqual(matchups[1].pitcher_id, 'p1', 'Second matchup has correct pitcher');
 
+  const opposing = {
+    lineup: roster.lineup,
+    pitcher: {
+      name: 'Opposing Pitcher',
+      player_id: 'pOpp',
+      TBF: 200,
+      stats: { IP: 50, H: 40, HR: 8, BB: 20, SO: 60, HBP: 2 },
+      rates: { kRate: 0.30, bbRate: 0.10, hrRate: 0.04, BABIP: 0.280 }
+    }
+  };
+  const vsOpp = prepareMatchups(roster, opposing);
+  assertEqual(vsOpp[0].pitcher_id, 'pOpp', 'Optional pitching roster is the pitcher on the mound');
+
   // Check that probabilities are present
   assertEqual(typeof matchups[0].probabilities.K, 'number', 'K probability is a number');
   assertEqual(typeof matchups[0].probabilities.BB, 'number', 'BB probability is a number');

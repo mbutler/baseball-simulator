@@ -148,8 +148,8 @@ async function startNewGame(): Promise<void> {
 // --- Start a new game ---
 function startGame(): void {
   if (!gameStore.homeRoster || !gameStore.awayRoster) return;
-  gameStore.homeMatchups = prepareMatchups(gameStore.homeRoster);
-  gameStore.awayMatchups = prepareMatchups(gameStore.awayRoster);
+  gameStore.homeMatchups = prepareMatchups(gameStore.homeRoster, gameStore.awayRoster);
+  gameStore.awayMatchups = prepareMatchups(gameStore.awayRoster, gameStore.homeRoster);
   gameStore.gameState = initGameState();
   // Reset persistent at-bat log
   gameStore.atBatLog = [];
@@ -459,8 +459,8 @@ function updateRostersWithNewLineups(): void {
   
   // Rebuild matchups for future at-bats
   if (gameStore.homeRoster && gameStore.awayRoster) {
-    gameStore.homeMatchups = prepareMatchups({ lineup: gameStore.homeRoster.lineup, pitcher: gameStore.awayRoster.pitcher });
-    gameStore.awayMatchups = prepareMatchups({ lineup: gameStore.awayRoster.lineup, pitcher: gameStore.homeRoster.pitcher });
+    gameStore.homeMatchups = prepareMatchups(gameStore.homeRoster, gameStore.awayRoster);
+    gameStore.awayMatchups = prepareMatchups(gameStore.awayRoster, gameStore.homeRoster);
   }
   
   // Update the display

@@ -34,8 +34,8 @@ async function main() {
     away.pitchers
   );
 
-  const homeMatchups = prepareMatchups(homeRoster);
-  const awayMatchups = prepareMatchups(awayRoster);
+  const homeMatchups = prepareMatchups(homeRoster, awayRoster);
+  const awayMatchups = prepareMatchups(awayRoster, homeRoster);
 
   // --- Sample probability outputs from first few batters ---
   console.log('\n=== Probability Model Sample (first 3 batters vs pitcher) ===');

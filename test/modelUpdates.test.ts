@@ -2,8 +2,9 @@
  * Tests for model updates: log5, batter hit types, pitcher HBP, steal SB/CS/csPct, sacrifice fly
  */
 import { describe, test, expect } from 'bun:test'
-import { getAtBatProbabilities } from '../src/core/probabilityModel.js'
+import { getAtBatProbabilities, regressRate, LEAGUE_HBP_RATE, PRIOR_PA } from '../src/core/probabilityModel.js'
 import { initGameState, simulateAtBat, attemptSteal } from '../src/core/gameEngine.js'
+import { convertPositionCode } from '../src/utils/describeOutcome.js'
 
 const makeBatter = (overrides: Record<string, any> = {}) => ({
   name: 'Test Batter',
@@ -111,6 +112,69 @@ describe('Pitcher HBP rate', () => {
     const probsLow = getAtBatProbabilities(batter, lowHbpPitcher)
 
     expect(probsHigh.HBP).toBeGreaterThan(probsLow.HBP)
+  })
+
+  test('zero HBP in a tiny sample is not treated as a true 0% rate', () => {
+    const batter = makeBatter({ PA: 20, stats: { ...makeBatter().stats, HBP: 0 } })
+    const pitcher = makePitcher({ TBF: 40, stats: { ...makePitcher().stats, HBP: 0 } })
+    const probs = getAtBatProbabilities(batter, pitcher)
+    expect(probs.HBP).toBeGreaterThan(0.004)
+    expect(probs.HBP).toBeLessThan(LEAGUE_HBP_RATE + 0.005)
+  })
+})
+
+describe('Sample-size regression', () => {
+  test('0-for-20 shrinks toward league instead of staying at zero', () => {
+    const shrunk = regressRate(0, 20, LEAGUE_HBP_RATE, PRIOR_PA)
+    expect(shrunk).toBeGreaterThan(0.007)
+    expect(shrunk).toBeLessThan(LEAGUE_HBP_RATE)
+  })
+
+  test('full-season rates barely move', () => {
+    const shrunk = regressRate(0.30, 600, 0.22, PRIOR_PA)
+    expect(shrunk).toBeGreaterThan(0.28)
+    expect(shrunk).toBeLessThan(0.30)
+  })
+})
+
+describe('Opposing pitcher is used in at-bats', () => {
+  test('away batters face the home pitcher, not their own starter', () => {
+    const awayBatter = makeBatter({ player_id: 'away1', rates: { kRate: 0.10, bbRate: 0.08, hrRate: 0.03, BABIP: 0.29 } })
+    const awayPitcher = makePitcher({ player_id: 'awayP', rates: { kRate: 0.08, bbRate: 0.08, hrRate: 0.03, BABIP: 0.29 }, TBF: 500 })
+    const homePitcher = makePitcher({ player_id: 'homeP', rates: { kRate: 0.40, bbRate: 0.08, hrRate: 0.03, BABIP: 0.29 }, TBF: 500 })
+    const homeBatter = makeBatter({ player_id: 'home1' })
+
+    const awayRoster = { lineup: [awayBatter], pitcher: awayPitcher }
+    const homeRoster = { lineup: [homeBatter], pitcher: homePitcher }
+    const matchup = [{
+      batter_id: 'away1',
+      pitcher_id: 'homeP',
+      probabilities: { K: 0.2, BB: 0.08, HBP: 0.01, HR: 0.03, '1B': 0.15, '2B': 0.05, '3B': 0.01, Out: 0.47 }
+    }]
+
+    const vsHome = getAtBatProbabilities(awayBatter, homePitcher)
+    const vsOwn = getAtBatProbabilities(awayBatter, awayPitcher)
+    expect(vsHome.K).toBeGreaterThan(vsOwn.K + 0.05)
+
+    let strikeouts = 0
+    const n = 400
+    for (let i = 0; i < n; i++) {
+      const state = initGameState()
+      const result = simulateAtBat(matchup, matchup, state, [], [], awayRoster, homeRoster)
+      if (result.outcome === 'K') strikeouts++
+    }
+    const kRate = strikeouts / n
+    // Should land near the home pitcher matchup, not the weak own-starter matchup.
+    expect(kRate).toBeGreaterThan((vsHome.K + vsOwn.K) / 2)
+  })
+})
+
+describe('convertPositionCode', () => {
+  test('maps Baseball Reference codes, including a leading slash', () => {
+    expect(convertPositionCode('6')).toBe('SS')
+    expect(convertPositionCode('4/6')).toBe('2B')
+    expect(convertPositionCode('/2D')).toBe('C')
+    expect(convertPositionCode('3H/D')).toBe('1B')
   })
 })
 

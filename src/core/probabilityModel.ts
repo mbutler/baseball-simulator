@@ -38,14 +38,33 @@ export interface AtBatSituation {
   twoOuts?: boolean;
 }
 
-function safeRate(rate: number | null | undefined, fallback: number): number {
-  return rate == null || isNaN(rate) || rate === 0 ? fallback : rate;
-}
+export const LEAGUE_K_RATE = 0.22;
+export const LEAGUE_BB_RATE = 0.08;
+export const LEAGUE_HR_RATE = 0.03;
+export const LEAGUE_HBP_RATE = 0.01;
+export const LEAGUE_BABIP = 0.29;
+export const LEAGUE_ERR_RATE = 0.012; // ~.988 fielding percentage
 
-const LEAGUE_K_RATE = 0.22; // MLB average K/PA
-const LEAGUE_BB_RATE = 0.08; // MLB average BB/PA
-const LEAGUE_HR_RATE = 0.03; // MLB average HR/PA
-const LEAGUE_HBP_RATE = 0.01; // MLB average HBP/PA
+/** Pseudo-counts for empirical-Bayes shrinkage. About 100 PA / 80 BIP / 80 chances. */
+export const PRIOR_PA = 100;
+export const PRIOR_TBF = 100;
+export const PRIOR_BIP = 80;
+export const PRIOR_HITS = 30;
+export const PRIOR_CHANCES = 80;
+
+/**
+ * Shrink an observed rate toward a league mean. Tiny samples (including 0-for-N)
+ * move close to league; full-season samples stay close to the observed rate.
+ */
+export function regressRate(
+  observed: number | null | undefined,
+  n: number,
+  league: number,
+  priorN: number
+): number {
+  if (observed == null || Number.isNaN(observed) || !(n > 0)) return league;
+  return (observed * n + league * priorN) / (n + priorN);
+}
 
 /**
  * Given a normalized batter and pitcher, compute the at-bat outcome probabilities.
@@ -62,30 +81,30 @@ export function getAtBatProbabilities(
   const bRates = batter.rates || {};
   const pRates = pitcher.rates || {};
   const bStats = batter.stats || {};
+  const pStats = pitcher.stats || {};
 
-  // Clamp all input rates, using league average if missing or zero
-  const kRateB = clamp01(safeRate(bRates.kRate, LEAGUE_K_RATE), 'batter.kRate');
-  const kRateP = clamp01(safeRate(pRates.kRate, LEAGUE_K_RATE), 'pitcher.kRate');
-  const bbRateB = clamp01(safeRate(bRates.bbRate, LEAGUE_BB_RATE), 'batter.bbRate');
-  const bbRateP = clamp01(safeRate(pRates.bbRate, LEAGUE_BB_RATE), 'pitcher.bbRate');
-  const hrRateB = clamp01(safeRate(bRates.hrRate, LEAGUE_HR_RATE), 'batter.hrRate');
-  const hrRateP = clamp01(safeRate(pRates.hrRate, LEAGUE_HR_RATE), 'pitcher.hrRate');
-  const babipB = clamp01(bRates.BABIP ?? 0.29, 'batter.BABIP');
-  const babipP = clamp01(pRates.BABIP ?? 0.29, 'pitcher.BABIP');
-
-  // Clamp stats
   const PA = Math.max(0, batter.PA || 0);
+  const TBF = Math.max(0, pitcher.TBF || 0);
   const HBP = Math.max(0, bStats.HBP ?? 0);
   const singles = Math.max(0, bStats.singles ?? 0);
   const doubles = Math.max(0, bStats.doubles ?? 0);
   const triples = Math.max(0, bStats.triples ?? 0);
-
-  // Pitcher HBP rate (from Baseball Reference)
-  const pStats = pitcher.stats || {};
   const pitcherHBP = Math.max(0, pStats.HBP ?? 0);
-  const TBF = Math.max(1, pitcher.TBF || 1);
-  const hbpRateP = clamp01(pitcherHBP / TBF, 'pitcherHBP');
-  const hbpRateB = PA > 0 ? clamp01(HBP / PA, 'batterHBP') : LEAGUE_HBP_RATE;
+
+  const kRateB = clamp01(regressRate(bRates.kRate, PA, LEAGUE_K_RATE, PRIOR_PA), 'batter.kRate');
+  const kRateP = clamp01(regressRate(pRates.kRate, TBF, LEAGUE_K_RATE, PRIOR_TBF), 'pitcher.kRate');
+  const bbRateB = clamp01(regressRate(bRates.bbRate, PA, LEAGUE_BB_RATE, PRIOR_PA), 'batter.bbRate');
+  const bbRateP = clamp01(regressRate(pRates.bbRate, TBF, LEAGUE_BB_RATE, PRIOR_TBF), 'pitcher.bbRate');
+  const hrRateB = clamp01(regressRate(bRates.hrRate, PA, LEAGUE_HR_RATE, PRIOR_PA), 'batter.hrRate');
+  const hrRateP = clamp01(regressRate(pRates.hrRate, TBF, LEAGUE_HR_RATE, PRIOR_TBF), 'pitcher.hrRate');
+
+  const bipB = Math.max(0, PA - (bStats.BB ?? 0) - (bStats.HBP ?? 0) - (bStats.SO ?? 0) - (bStats.HR ?? 0));
+  const bipP = Math.max(0, TBF - (pStats.BB ?? 0) - (pStats.SO ?? 0) - (pStats.HR ?? 0) - pitcherHBP);
+  const babipB = clamp01(regressRate(bRates.BABIP, bipB, LEAGUE_BABIP, PRIOR_BIP), 'batter.BABIP');
+  const babipP = clamp01(regressRate(pRates.BABIP, bipP, LEAGUE_BABIP, PRIOR_BIP), 'pitcher.BABIP');
+
+  const hbpRateP = clamp01(regressRate(TBF > 0 ? pitcherHBP / TBF : null, TBF, LEAGUE_HBP_RATE, PRIOR_TBF), 'pitcherHBP');
+  const hbpRateB = clamp01(regressRate(PA > 0 ? HBP / PA : null, PA, LEAGUE_HBP_RATE, PRIOR_PA), 'batterHBP');
 
   // 1. Assign K, BB, HBP, HR rates using log5 (batter vs pitcher matchup)
   let K = log5(kRateB, kRateP, LEAGUE_K_RATE);
@@ -99,23 +118,21 @@ export function getAtBatProbabilities(
 
   // 3. Use log5 for BABIP; clamp to [0.24, 0.40] to keep results realistic while
   // still allowing meaningful separation between contact-quality profiles.
-  let BABIP = Math.max(0.24, Math.min(0.40, log5(babipB, babipP, 0.29)));
+  let BABIP = Math.max(0.24, Math.min(0.40, log5(babipB, babipP, LEAGUE_BABIP)));
   let hitsInPlay = BABIP * BIP;
   let outsInPlay = BIP - hitsInPlay;
 
-  // 4. Assign hit types: use batter-specific rates if available, else league defaults (75/20/5)
+  // 4. Assign hit types: batter mix shrunk toward league 75/20/5 so a 0-triple
+  // week of April does not become a true 0% triple rate.
   const totalNonHR = singles + doubles + triples;
-  let singleRate: number;
-  let doubleRate: number;
-  let tripleRate: number;
-  if (totalNonHR > 0) {
-    singleRate = singles / totalNonHR;
-    doubleRate = doubles / totalNonHR;
-    tripleRate = triples / totalNonHR;
-  } else {
-    singleRate = 0.75;
-    doubleRate = 0.20;
-    tripleRate = 0.05;
+  let singleRate = regressRate(totalNonHR > 0 ? singles / totalNonHR : null, totalNonHR, 0.75, PRIOR_HITS);
+  let doubleRate = regressRate(totalNonHR > 0 ? doubles / totalNonHR : null, totalNonHR, 0.20, PRIOR_HITS);
+  let tripleRate = regressRate(totalNonHR > 0 ? triples / totalNonHR : null, totalNonHR, 0.05, PRIOR_HITS);
+  const hitMix = singleRate + doubleRate + tripleRate;
+  if (hitMix > 0) {
+    singleRate /= hitMix;
+    doubleRate /= hitMix;
+    tripleRate /= hitMix;
   }
   let oneB = hitsInPlay * singleRate;
   let twoB = hitsInPlay * doubleRate;

@@ -38,12 +38,16 @@ export interface Matchup {
 }
 
 /**
- * Given a team roster, generate batter-vs-pitcher matchups.
- * @param roster - Team roster with lineup and pitcher
+ * Given a batting roster, generate batter-vs-pitcher matchups.
+ * Pass the opposing roster as the second argument so each batter is paired
+ * with the pitcher on the mound, not their own starter.
+ * @param battingRoster - Team at the plate
+ * @param pitchingRoster - Team in the field (defaults to battingRoster for tests)
  * @returns Array of matchup objects (one per batter)
  */
-export function prepareMatchups(roster: Roster): Matchup[] {
-  const { lineup, pitcher } = roster;
+export function prepareMatchups(battingRoster: Roster, pitchingRoster?: Roster): Matchup[] {
+  const { lineup } = battingRoster;
+  const pitcher = (pitchingRoster ?? battingRoster).pitcher;
 
   return lineup.map(batter => {
     const probabilities = getAtBatProbabilities(batter, pitcher);

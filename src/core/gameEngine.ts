@@ -4,11 +4,11 @@
  */
 
 import { randomWeightedChoice } from '../utils/random.js';
-import { describeOutcome } from '../utils/describeOutcome.js';
+import { describeOutcome, convertPositionCode } from '../utils/describeOutcome.js';
 import type { Matchup, Roster } from './matchupPreparer.js';
 import type { NormalizedBatter } from '../types/baseball.js';
 import type { NormalizedBatter as StatNormalizedBatter } from '../types/baseball.js';
-import { getAtBatProbabilities } from './probabilityModel.js';
+import { getAtBatProbabilities, regressRate, LEAGUE_ERR_RATE, PRIOR_CHANCES } from './probabilityModel.js';
 import type { AtBatSituation } from './probabilityModel.js';
 
 /**
@@ -209,6 +209,7 @@ export function simulateAtBat(
   const teamIndex = state.top ? 0 : 1;
   const lineup = teamIndex === 0 ? awayMatchups : homeMatchups;
   const roster = teamIndex === 0 ? awayRoster : homeRoster;
+  const pitchingRoster = teamIndex === 0 ? homeRoster : awayRoster;
   let fielders = teamIndex === 0 ? homeFielders : awayFielders; // fielding team
   // Defensive: ensure fielders is always an array
   const safeFielders = Array.isArray(fielders) ? fielders : [];
@@ -223,7 +224,7 @@ export function simulateAtBat(
   const situation: AtBatSituation = { risp, late, twoOuts };
 
   // Use situational probabilities
-  let probabilities = getAtBatProbabilities(batter, roster.pitcher, situation);
+  let probabilities = getAtBatProbabilities(batter, pitchingRoster.pitcher, situation);
 
   // --- Pitcher Fatigue Logic ---
   if (state.pitcherFatigue && state.pitcherFatigue[1 - teamIndex]) {
@@ -266,20 +267,14 @@ export function simulateAtBat(
     const match = descriptiveOutcome.match(/to ([A-Z0-9]+)/);
     if (match) {
       fielderPosition = match[1];
-      fielder = safeFielders.find(f => f.position === fielderPosition);
-      // Error probability logic
+      fielder = findFielder(safeFielders, fielderPosition);
       if (fielder && fielder.stats) {
-        const E = Number(fielder.stats['E']) || 0;
-        const PO = Number(fielder.stats['PO']) || 0;
-        const A = Number(fielder.stats['A']) || 0;
-        const chances = PO + A + E;
-        const errorProb = chances > 0 ? E / chances : 0.01; // fallback to 1% if no data
-        if (Math.random() < errorProb) {
+        if (Math.random() < fieldingErrorProbability(fielder)) {
           errorOccurred = true;
         }
       } else {
-        // No stats, fallback to 1% error chance
-        if (Math.random() < 0.01) {
+        // No stats, fallback to league error chance
+        if (Math.random() < LEAGUE_ERR_RATE) {
           errorOccurred = true;
         }
       }
@@ -445,7 +440,7 @@ export function simulateAtBat(
   // Check for passed balls and wild pitches on certain outcomes
   if (outcome === 'K' || outcome === 'BB') {
     // Find the catcher from the defensive team
-    const catcher = safeFielders.find(f => f.position === 'C');
+    const catcher = findFielder(safeFielders, 'C');
     if (catcher && catcher.stats) {
       const FP = Number(catcher.stats['FP']) || 0.985; // Fielding Percentage
       const PB = Number(catcher.stats['PB']) || 0; // Passed Balls (lower is better)
@@ -679,6 +674,25 @@ export function attemptPickoff(
 export interface GameRoster {
   lineup: NormalizedBatter[];
   pitcher: any; // Keep pitcher type flexible for now
+}
+
+function findFielder(fielders: Fielder[], position: string): Fielder | undefined {
+  return fielders.find(f => f.position === position || convertPositionCode(f.position) === position);
+}
+
+/**
+ * Error rate on a ball in play. Tiny-sample 0-error lines shrink toward league
+ * average; a fixture that passes E as a probability (no PO/A) is left as-is.
+ */
+function fieldingErrorProbability(fielder: Fielder): number {
+  const stats = fielder.stats || {};
+  const E = Number(stats['E']) || 0;
+  const PO = Number(stats['PO']) || 0;
+  const A = Number(stats['A']) || 0;
+  if (PO + A === 0 && E > 0 && E <= 1) return E;
+  const chances = PO + A + E;
+  if (chances <= 0) return LEAGUE_ERR_RATE;
+  return regressRate(E / chances, chances, LEAGUE_ERR_RATE, PRIOR_CHANCES);
 }
 
 // Type alias for the base structure

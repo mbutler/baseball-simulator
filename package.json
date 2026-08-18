@@ -5,7 +5,9 @@
   "scripts": {
     "start": "bun build --minify src/index.ts --watch --outfile ./dist/js/bundle.js",
     "docs": "documentation build src/** -f html -o docs --shallow",
-    "update-dataset": "bun run src/scripts/updateDataset.ts"
+    "update-dataset": "bun run src/scripts/updateDataset.ts",
+    "monte-carlo": "bun run src/scripts/monteCarloValidate.ts",
+    "monte-carlo-league": "bun run src/scripts/monteCarloValidate.ts 400 --multi"
   },
   "devDependencies": {
     "documentation": "^14.0.3"

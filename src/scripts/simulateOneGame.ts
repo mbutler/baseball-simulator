@@ -31,8 +31,8 @@ async function main() {
     away.pitchers
   );
 
-  const homeMatchups = prepareMatchups(homeRoster);
-  const awayMatchups = prepareMatchups(awayRoster);
+  const homeMatchups = prepareMatchups(homeRoster, awayRoster);
+  const awayMatchups = prepareMatchups(awayRoster, homeRoster);
   const state = initGameState();
 
   console.log(`\n${'='.repeat(60)}`);

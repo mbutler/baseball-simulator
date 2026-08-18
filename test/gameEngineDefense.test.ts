@@ -71,12 +71,12 @@ function runTests(): void {
   };
 
   const awayFielders = [
-    { position: 'SS', stats: { E: 0.05 } },
+    { position: 'SS', stats: { E: 1 } },
     { position: '2B', stats: { E: 0.03 } }
   ];
 
   const homeFielders = [
-    { position: 'SS', stats: { E: 0.04 } },
+    { position: 'SS', stats: { E: 1 } },
     { position: '2B', stats: { E: 0.02 } }
   ];
 

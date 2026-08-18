@@ -153,7 +153,7 @@ describe('Probability Model Debug', () => {
     expect(probabilities.BB).toBeLessThan(0.20) // Log5 can push higher
     expect(probabilities.HR).toBeGreaterThan(0.02) // Higher HR rate
     expect(probabilities.HR).toBeLessThan(0.06)
-    expect(probabilities.Out).toBeGreaterThan(0.55) // Lower out rate
+    expect(probabilities.Out).toBeGreaterThan(0.50) // Batted-ball outs still the majority
     expect(probabilities.Out).toBeLessThan(0.70)
   })
 }) 
