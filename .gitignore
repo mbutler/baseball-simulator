@@ -12,3 +12,10 @@ dist/data/statcast/chadwick-mlbam.csv
 # Derived data IS committed on purpose — dist/complete-dataset-*.json,
 # dist/count-profiles-*.json, and dist/data/statcast/pa-*.csv — so a clone on another
 # machine can pick the work up without re-scraping or re-fetching a season.
+
+# Generated card/binder pages. Unlike the derived data above these are NOT
+# committed: they rebuild in a second from count-profiles-*.json, and each page
+# carries a "printed <date>" stamp, so tracking them means a diff every run.
+dist/cards-*.html
+dist/binder-*.html
+dist/overlay-*.html

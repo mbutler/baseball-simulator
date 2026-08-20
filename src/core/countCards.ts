@@ -124,3 +124,69 @@ export function tallyFor(
 ): Tally | null {
   return profiles[side][`${playerId}|${team}`] ?? null;
 }
+
+/** The batter's declared approach on the resolution roll. See §7.9 of the count-game design. */
+export type Approach = 'protect' | 'deadRed';
+
+/**
+ * Linear weights, used for one purpose only: holding the two approaches at equal
+ * value so neither is strictly better. K and Out are both zero, which is exactly
+ * why the choice stays live at the table — the situational worth of a ball in
+ * play is the thing these weights cannot see.
+ */
+const APPROACH_WEIGHTS: Record<Outcome, number> = {
+  K: 0, BB: 0.69, HBP: 0.72, HR: 2.10, '1B': 0.89, '2B': 1.27, '3B': 1.62, Out: 0
+};
+
+/**
+ * Fixed "flavour" rates per approach. Power is deliberately absent: it is solved
+ * per column rather than printed, because a fixed power multiplier cannot hit
+ * neutrality in every column without draining an outcome to zero.
+ */
+export const APPROACH_SHAPE: Record<Approach, { K: number; BB: number; '1B': number }> = {
+  protect: { K: 0.80, BB: 1.00, '1B': 1.08 },
+  deadRed: { K: 1.20, BB: 0.88, '1B': 0.85 }
+};
+
+const wobaOf = (r: AtBatProbabilities): number =>
+  OUTCOMES.reduce((a, o) => a + r[o] * APPROACH_WEIGHTS[o], 0);
+
+/**
+ * Recast one resolution column for a declared approach.
+ *
+ * K, BB and 1B move by the fixed rates above; the power outcomes (HR/3B/2B) are
+ * scaled by a solved factor and Out absorbs the mass balance. The factor is
+ * bisected so the column's value exactly matches the neutral column's — if either
+ * approach were better in a vacuum it would not be a decision, it would be the
+ * correct answer printed on a card.
+ *
+ * @param base - The neutral column for one bucket
+ * @param approach - protect (contact, low variance) or deadRed (power, high variance)
+ * @returns A column summing to 1, equal in value to `base`
+ */
+export function applyApproach(base: AtBatProbabilities, approach: Approach): AtBatProbabilities {
+  const shape = APPROACH_SHAPE[approach];
+  const target = wobaOf(base);
+
+  const build = (power: number): AtBatProbabilities => {
+    const r = {} as AtBatProbabilities;
+    r.K = base.K * shape.K;
+    r.BB = base.BB * shape.BB;
+    r['1B'] = base['1B'] * shape['1B'];
+    r.HBP = base.HBP;
+    for (const o of ['HR', '3B', '2B'] as const) r[o] = base[o] * power;
+    const used = OUTCOMES.filter(o => o !== 'Out').reduce((a, o) => a + r[o], 0);
+    r.Out = Math.max(0, 1 - used);
+    const total = OUTCOMES.reduce((a, o) => a + r[o], 0);
+    for (const o of OUTCOMES) r[o] /= total;
+    return r;
+  };
+
+  // Value rises monotonically with the power scale, so a plain bisection is safe.
+  let lo = 0.05, hi = 4;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (wobaOf(build(mid)) > target) hi = mid; else lo = mid;
+  }
+  return build((lo + hi) / 2);
+}

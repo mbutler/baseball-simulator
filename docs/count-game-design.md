@@ -51,23 +51,128 @@ The full count path is preserved in the data cache, so this definition can be re
 
 ## 3. The core loop
 
-Two rolls, one decision, every plate appearance.
+Two rolls and two decisions, in strict sequence. Every plate appearance:
 
-**Roll 1 — LEVERAGE.** Both players roll at once. The pitcher's card and the batter's card resolve to *which count bucket the PA reaches*: early contact / ahead / even / behind. **No strikeout, no walk, no hit.** Just: who won the first two pitches.
+1. **Pitcher rolls LEVERAGE** — one d100 on the batter's leverage strip, which resolves *which
+   count bucket the PA reaches*: early contact / 2-0 / 1-1 / 0-2. **No strikeout, no walk, no
+   hit.** Just: who won the first two pitches.
+2. **Pitcher decides** whether to spend stamina to shift the bucket one rung in his favour —
+   bear down now, pay for it in the seventh. There is no pool of tokens: spending advances his
+   own fatigue track, so the price is batters off his outing (§7.8).
+3. **Batter declares** *protect* (shrink the strikeout, shrink the power) or *sit dead-red*
+   (the reverse), knowing the bucket he is about to hit in.
+4. **Batter rolls RESOLUTION** — one d100 on that bucket's column of his contact card.
+   Strikeouts and walks live *here*, emerging from the count rather than being printed as flat
+   season rates.
 
-**The decision point.** The pitcher may spend from a stamina pool to shift the count one step in their favor — bear down now, pay for it in the seventh. The batter may choose to *protect* (shrink the strikeout, shrink the power) or *sit dead-red* (the reverse). One choice, a few seconds, real tension.
+**Nothing tracks balls and strikes.** One roll lands in one box and the PA resolves from there.
+`2-0 / 1-1 / 0-2` are only the §2 pivot's description of how each bucket was cut from the data.
 
-**Roll 2 — RESOLUTION.** The batter's contact card has four columns, one per bucket. Roll on the column roll 1 selected. Strikeouts and walks live *here*, emerging from the count rather than being printed as flat season rates.
+**The printed labels are `AHEAD` / `EVEN` / `BEHIND`, not the counts.** Two reasons, and the
+first is the one that will come up at the table:
 
-The cup still works: the batter rolls under it and lifts only when the count column is known.
+- **Printing "1-1" claims the PA *is* at 1-1.** It is not — it *passed through* 1-1 on the third
+  pitch and will travel on from there. The first question anyone asks a card labelled with
+  counts is "where is the full count?", and the answer is that 3-2 is not a bucket and cannot
+  be one: a PA passes through many counts, so bucketing on any later count double-counts and
+  destroys the clean partition §2 depends on. **3-2 lives inside the columns** — a PA that goes
+  2-0 → 3-1 → 3-2 → walk is already sitting in the AHEAD column's BB boxes, which is most of
+  why that column walks 29% of the time. The full count is in the game; it is resolved rather
+  than displayed.
+- **The pivot is still open** (§8). Moving it to the 4th pitch changes which counts are even
+  reachable, so counts printed on physical cards would be wrong the day the profiles are
+  re-distilled. `AHEAD / EVEN / BEHIND` names the leverage state itself and survives a re-cut.
+
+**Early contact is not on the ladder.** It is the ball already put in play inside two pitches,
+so a shift cannot move a PA into or out of it. It still takes a resolution roll — it is the
+hitter's best bucket at .543 SLG — but it can produce neither a K nor a BB, which is why that
+column reads 0% for both.
+
+### Why sequential, and why the cup is retired
+
+The face-off in §1 rolled both dice at once, and the cup existed to solve a problem it created:
+the batter's die was ignored ~30% of the time, so hiding it bought drama that the structure
+otherwise wasted. This design has no such waste, and three things now argue against
+simultaneity:
+
+- **The math only ever wanted one leverage roll.** §4 combines the batter's and pitcher's
+  bucket distributions with log5 into a *single* distribution. Two dice would be re-deriving by
+  hand what the card already prints.
+- **The chain is strictly ordered anyway.** The pitcher cannot price a shift before seeing the
+  bucket, and the batter cannot choose an approach before seeing the spend. There is nothing
+  left over to resolve simultaneously.
+- **Each seat gets its own moment** — pitcher acts, batter answers — instead of both players
+  rolling into a shared shrug.
+
+The tension the cup used to supply now comes from step 2 into step 3: shifting a hitter from
+1-1 to 0-2 does not merely worsen his column, it **takes his decision away**, because dead-red
+against a 0-2 column is indefensible. The pitcher is spending stamina to strip the batter of
+agency, and the batter watches him do it.
 
 ### What this changes
 
-The pitcher's card **stops being an outcome card entirely.** A pitcher's identity becomes "how often do I get you to 0-2." That is both true to baseball and something no dice game currently expresses. It also makes the pitching seat an active resource game across nine innings rather than a lookup chart someone reads on the hitter's behalf.
+The pitcher's card **stops being an outcome card entirely**, and the pitching seat becomes an
+active resource game across nine innings rather than a lookup chart someone reads on the
+hitter's behalf. That part survives.
+
+> ⚠️ **This section used to claim that "a pitcher's identity becomes *how often do I get you to
+> 0-2*." That claim is false, and a playtest caught it before the measurement did — the pitcher
+> did not feel unique.** Leverage carries roughly a tenth of a pitcher; resolution carries the
+> rest. See **§9**, which supersedes this paragraph and settles the card architecture.
 
 ### Where the modules still fit
 
 Everything in §6 of the brief about Strat's icon trick survives intact, and gets better: modules can now key off the *count column* as well as the icons. `TIRED` becomes "shift one leverage box toward the hitter," which is exactly what the digital engine's fatigue rule does. `CLUTCH` can bias the leverage roll instead of the outcome roll, which is closer to how RISP actually works.
+
+### Fractal detail — layers on one roll
+
+Strat gets very fine-grained if you want it, and that "dig in only when you care" quality is
+worth stealing. The rule that makes it cheap here:
+
+> **A layer reads more of the roll that already happened. It costs nothing when unused.**
+
+`Out` is always the *last* band in every column, so nested sub-bands would have to be printed
+per column (54-100 in one, 61-100 in another). The **ones digit** of the same d100 avoids that
+entirely — it is near-uniform whichever band you landed in, so a single line serves all seven
+columns:
+
+```
+OUTS — ones digit of your roll:   0-4 GB · 5-7 FB · 8 LD · 9 POP
+```
+
+Roll 73 → Out → ends in 3 → groundout. No second die, no cross-reference, and a basic player
+never looks at the line. That maps 50/30/10/10 against the engine's 48/32/12/8. (The digits are
+not *perfectly* uniform — in a 47-box band some appear 5 times and others 4, a ±11% wobble, and
+exactly zero when the band length is a multiple of 10. Acceptable for out type; do not price
+anything else on it.)
+
+**Where free ends.** The fielder cannot come from the same roll: the tens digit is not
+independent, since it is what put the roll in the Out band to begin with. That is the honest
+place to draw the advanced-game line.
+
+| Layer | Reads | Cost |
+|---|---|---|
+| Out | the band | basic |
+| Groundout | ones digit of the same roll | **free** |
+| 6-3 | a d6 | a die |
+
+The same trick answers the `early` question in §8: if early contact resolves on the leverage
+strip itself, the 1-28 range prints `HR / 1B / 2B / Out` directly and 27% of PAs become a
+genuine one-roll affair.
+
+**A layer must unlock a module, not add a name.** A line that only says "groundout" instead of
+"out" is ink. But GB is the trigger for the brief's Defense module (*GB + runner on 1st → GDP
+check*) and FB is the trigger for the sac fly the engine already models — so out type makes two
+modules printable that currently are not. That is what earns the line.
+
+**Blocked on data, and it is a re-fetch not a re-distill.** [`describeOutcome.ts`](../src/utils/describeOutcome.ts)
+takes only the outcome string — no player — so every hitter in the game grounds out 48% of the
+time. Printed as-is, all nine Cubs get an identical out-type line, which fails the §8 bar that
+personality must survive flattening. The PA cache holds `batter,pitcher,batTeam,fldTeam,path,outcome`
+and the fetcher requests seven Savant columns, none of them `bb_type`; Baseball Reference's
+`rawBatting` has no GB/FB either, only `b_gidp`, which is confounded by how often men were on
+first. See §7 item 6. **Do this after the paper playtest, not before** — a season re-pull is not
+worth spending on a layer that might get cut.
 
 ## 4. The math
 
@@ -216,26 +321,254 @@ The distiller prints a match-rate audit and the top unmatched players by PA lost
 5. **Decide on the scraped-HTML history rewrite.** See the note in §5 — the pages are untracked
    going forward but still present in history. Either accept that, or plan a `git filter-repo`
    pass and force-push at a moment when no other machine has outstanding work.
-6. **Incremental writes in the fetcher.** `fetchSeason()` currently writes `pa-<year>.csv`
-   once, after all ~50 chunks. A crash at chunk 45 loses the entire run. Write per chunk and
-   resume from what is already cached.
+6. **Incremental writes in the fetcher — and add `bb_type` in the same pass.**
+   `fetchSeason()` currently writes `pa-<year>.csv` once, after all ~50 chunks. A crash at
+   chunk 45 loses the entire run. Write per chunk and resume from what is already cached.
+   **While the fetcher is open, add `bb_type` to the requested Savant columns**
+   ([`fetchCountData.ts:138`](../src/scripts/fetchCountData.ts)) and carry it into the cache as
+   a 7th field. It is the only thing standing between the game and per-hitter out types, and
+   pulling it now makes this one season re-fetch instead of two — see the fractal-detail
+   subsection in §3.
 
 ### Design — before building the card generator
 
-7. **Play three innings on paper.** Nine Cubs batters plus Peralta/Boyd. The test is not accuracy: **can someone who does not know the stats tell Hoerner, Crow-Armstrong, and Peralta apart after three at-bats?** A design that flattens PCA into Hoerner is dead regardless of how well it validates.
-8. **Specify the stamina economy.** How large is the pool, what does a shift cost, how does it refill (or not), and how does it map to real pitcher stamina — the brief's "18 batters faced" fatigue threshold is the obvious anchor.
-9. **Specify the batter's protect / sit-dead-red choice.** It must be a real trade-off in both directions, not a strictly-better option. Probably: protect trades power for contact on the resolution roll, dead-red the reverse.
-10. **Pick the die.** The brief recommends d100 or 2d10 so rare events (3B, HBP) survive. The four-column structure makes this more pressing — a d20 column has only 20 boxes to spend across eight outcomes.
-11. **Decide generic vs. matchup-specific cards.** Unchanged from the brief's open question, but note the leverage card makes generic cards more defensible: a generic pitcher leverage card is a much better approximation than a generic outcome card.
+7. **Play three innings on paper.** (The economy no longer needs the table's help — see
+   item 8's validation. What is left for paper is whether the decision is *interesting*, not
+   whether it is *balanced*.) Nine Cubs batters plus Peralta/Boyd. The test is not accuracy: **can someone who does not know the stats tell Hoerner, Crow-Armstrong, and Peralta apart after three at-bats?** A design that flattens PCA into Hoerner is dead regardless of how well it validates.
+8. ~~**Specify the stamina economy.**~~ **SPEC BELOW — needs playtest tuning, not more design.**
+
+   **There is no pool and no tokens. There is one counter.** Every pitcher card prints an
+   **ENDURANCE** number. A fatigue track advances **+1 for every batter faced** and **+1 more
+   for every stamina point spent**. When the track passes ENDURANCE the pitcher is **TIRED**:
+   every subsequent leverage roll shifts one rung toward the hitter, permanently. Spending is
+   therefore not a separate resource at all — it is *burning batters off your own outing*, and
+   the decision reads as **how many batters am I willing to give up to win this one?**
+
+   Shift costs are priced off the §2 value of each rung:
+
+   | Shift | Worth | Cost |
+   |---|---|---|
+   | AHEAD → EVEN | 175 points of OBP | **2** |
+   | EVEN → BEHIND | 103 points of OBP | **1** |
+   | Both, one PA | | 3 |
+
+   **ENDURANCE is derived, and the derivation is `round(0.779 × BF/GS)`** — batters faced per
+   start, from `p_bfp / p_gs` in the raw pitching table, scaled so the median starter lands on
+   the digital sim's 18-BF fade point. But the honest finding is that **real 2025 usage barely
+   varies**: across 105 qualified starters (GS ≥ 20, ≥90% of appearances as starts) BF/start
+   runs 18.9 to 25.9 with an interquartile range of just 22.4–23.8. Modern bullpen management
+   pulls everyone at roughly the same point regardless of quality, so the derived spread is
+   only six integers wide and **88% of starters land on 17, 18, or 19**:
+
+   | ENDURANCE | 15 | 16 | 17 | 18 | 19 | 20 |
+   |---|---|---|---|---|---|---|
+   | starters | 3 | 3 | 24 | 47 | 22 | 6 |
+
+   Valdez, Crochet and Webb print 20; Peralta 17; Kershaw 16; Rasmussen 15. So the number is
+   genuinely per-pitcher rather than tiered, but it is *effectively* coarse because reality is
+   coarse — do not go looking for a cleverer formula, and do not print tiers either, since the
+   tails are exactly where the interesting pitchers live.
+
+   Sizing check: a start is ~25 batters. At ENDURANCE 18 with no spending a pitcher is tired
+   for the last ~7; spend 6 early and he is tired for the last ~13. Nothing refills. The budget
+   is the start, which is what a pitch count already is.
+
+   **A TIRED pitcher may not spend.** This rule is load-bearing, and it was found by simulation
+   rather than by design. TIRED is capped at one rung however far past ENDURANCE the track runs,
+   so without this rule the *marginal* cost of the 40th point is zero — once gassed, a pitcher
+   spends freely and blanket spending becomes correct. [`shiftPolicySim.ts`](../src/scripts/shiftPolicySim.ts)
+   measured the hole at **2.50 runs per game** on a complete game: spend-on-everything allowed
+   2.80 against 5.29 for never spending. Capping it is also the thematically right answer — a
+   gassed pitcher has nothing left to bear down *with* — and it needs no new numbers, because it
+   caps lifetime spending near ENDURANCE on its own.
+
+   **Validation — PASS.** `bun run shift-policy 40000` plays whole games under six spending
+   policies, with the home pitcher on the policy under test and the away pitcher held at
+   `never` as a control. The bar is not "spending wins": a fairly priced resource is
+   **break-even in blanket use**, and only *judgement* profits.
+
+   | Regime | blanket spend vs never | best selective (`risp+late`) | verdict |
+   |---|---|---|---|
+   | Complete game | −0.022 runs | **−0.169 runs** | fair, rewards judgement |
+   | Hooked at ENDURANCE+6 | +0.063 runs | **−0.120 runs** | fair, rewards judgement |
+
+   Blanket spending lands inside ±0.07 runs of not spending at all in both regimes — break-even
+   — while spending only with runners in scoring position or late saves a consistent 0.12–0.17.
+   **Costs of 2 and 1 are correctly priced.** Two regimes are run because the bullpen assumption
+   otherwise carries the result: with a free, never-tiring, infinitely deep pen, burning a
+   starter costs nothing and every price looks too cheap. Neither regime is the truth; the price
+   holding in both is what makes it trustworthy.
+
+   Note the effect-size floor. At 40,000 games a 0.05-run difference is *statistically*
+   significant and completely meaningless at a table, so the script judges break-even against a
+   ±0.15 run band (~3% of the run environment) rather than against its own standard errors.
+
+9. ~~**Specify the batter's protect / sit-dead-red choice.**~~ **SPEC BELOW — needs playtest
+   tuning, not more design.**
+
+   **The choice exists only on AHEAD / EVEN / BEHIND.** On early contact the ball is already in
+   play, so a leverage roll into `early` skips steps 2 and 3 of §3 entirely and resolves in a
+   single roll — **27% of plate appearances carry no decisions at all**, which is what keeps
+   the loop from becoming a decision every six seconds.
+
+   There is no neutral third option. A neutral would be taken by default and the mechanic would
+   die.
+
+   Each approach fixes three "flavour" rates and then **solves the power scale λ** — applied to
+   HR / 3B / 2B — so the column's wOBA exactly matches the neutral column's, with Out absorbing
+   the mass balance:
+
+   | | K | BB | 1B | power |
+   |---|---|---|---|---|
+   | **PROTECT** | ×0.80 | — | ×1.08 | λ solved, ≈0.91–0.97 |
+   | **DEAD-RED** | ×1.20 | ×0.88 | ×0.85 | λ solved, ≈1.10–1.22 |
+
+   Dead-red walks less because a hitter hunting a fastball swings at more of them.
+
+   **Solve λ, not the 1B/Out split.** The first version of this fixed the power multipliers and
+   solved the split instead. It drained Crow-Armstrong's singles to *zero* on EVEN — a dead-red
+   swing that can never produce a single — and still missed neutrality by 27 points of wOBA in
+   the modal bucket. Capping the drain only traded one failure for the other. Solving λ reaches
+   Δ0.000 on all six columns with every outcome staying positive.
+
+   **wOBA neutrality is the generation constraint, and it is the whole point.** The pitcher's
+   shift is *allowed* to be plainly good because scarcity prices it. The batter's choice is
+   free, so if either option were better in a vacuum it would not be a decision — it would be
+   the correct answer printed on a card. Neutrality forces the **situation** to break the tie:
+   protect with a runner on 3rd and fewer than 2 out, or on 2nd with 2 out, or down 1 late —
+   anywhere a ball in play is worth more than a big one. Dead-red with the bases empty or down
+   2+ late, where a single is nearly worthless.
+
+   **The tie is broken by the one thing wOBA cannot see.** K and Out are both worth zero, so the
+   solver trades them freely — and it trades a *lot* of them. On BEHIND, Crow-Armstrong's
+   dead-red column converts 20 outs into strikeouts to buy one extra double. In a vacuum that is
+   neutral. At the table it is nothing of the kind: a ball in play scores the runner from third,
+   advances the runner from second, and can be booted. **That gap is the decision**, and it is
+   why dead-red on 0-2 is indefensible while the same choice on 2-0 is close. The mechanic
+   reproduces the baseball instinct instead of asking the player to supply it.
+
+   **Card cost: 7 columns per batter** — 1 early + (3 buckets × 2 approaches). Print all 7 for
+   the paper playtest rather than inventing a compression rule that has not been tested.
+10. ~~**Pick the die.**~~ **DONE — d100.** Two d10 read as tens/ones. The four-column structure
+    settled it: a d20 column has only 20 boxes to spend across eight outcomes, so 3B and HBP
+    round away entirely and every column starts looking alike. At d100 a box is one percentage
+    point, which means card generation is a direct read of the probability table — no rounding
+    policy, no "roll d6 for rare events" escape hatch. Both the leverage strip and each
+    resolution column are 100 boxes.
+
+    **Triples still do not survive, and should not be printed.** League 3B rate per bucket runs
+    0.23%–0.47%, so it rounds to **zero boxes out of 100 in every bucket** — d100 is not fine
+    enough, and d1000 is not a die anyone rolls. Triples should come from the brief's **LEGS**
+    module instead (SPEED converts a hit into an extra base), which is where a triple actually
+    comes from in baseball: a fast man on a ball in the gap, not a distinct batted-ball class.
+    Same for the rarest HBP columns. This is an argument *for* the module structure, not a
+    defect in it.
+11. ~~**Decide generic vs. matchup-specific cards.**~~ **DECIDED — split by channel.** The
+    hunch that "a generic pitcher leverage card is a much better approximation than a generic
+    outcome card" was exactly right, and §9 measures how right: leverage decomposes into a
+    generic strip plus a single additive grade at 0.0037 wOBA error, while resolution does not
+    decompose at all. **Leverage generic, resolution matchup-specific.** The consequence is that
+    this is a *series-set* game, not a season-set game — see §9.
 
 ### Deferred
 
-12. `src/scripts/printCards.ts` — print-ready HTML. Do not build this until item 7 feels right — item 2 already passes.
+12. ~~`src/scripts/printCards.ts` — print-ready HTML.~~ **DONE**, built early because item 7
+    needs cards to play with. `bun run print-cards [BATTING-TEAM] [PITCHING-TEAM]` emits a
+    d100 leverage strip and seven resolution rows per batter, plus the opposing starter's card
+    and a rules sheet, to `dist/cards-<team>-vs-<opp>.html`. Matchup-specific by default
+    (true log5 vs the named starter); `--generic` builds against a league-average opponent, so
+    the two flavours of §7.11 can be compared on paper rather than argued about.
+    **Every row is asserted to tile 1–100 exactly** — a printed card with a gap at 47 is
+    unplayable and silently so, which is the one defect that must never reach a table.
 13. Park sheets, reliever cards, the module set from the brief's §6.
 
 ## 8. Open questions
 
 - Is the pivot right at the 3rd pitch, or should it move to the 4th (more PAs resolve early, columns get thinner but more differentiated)? Cheap to test — re-distill only.
-- Should the `early` bucket be a column at all, or should first-pitch contact resolve on the leverage roll itself? It is 26.5% of PA and has a .669 SLG, so it is doing real work either way.
-- Does the pitcher's *resolution* profile matter, or is the pitcher fully expressed by leverage? If the latter, pitcher cards get much simpler and generic pitcher cards become nearly lossless.
+- Should the `early` bucket be a column at all, or should first-pitch contact resolve on the leverage roll itself? It is **26.8% of PA at a .336 OBP and .543 SLG** — the highest slugging of any bucket — so it is doing real work either way. (Earlier drafts of this line read 26.5% and .669 SLG, carried over from the single-day pilot; the full-season figures are the §2 table's, recomputed from the league tally.) Resolving it inline is a pure speed-vs-granularity trade — see the fractal-detail subsection in §3.
+- ~~Does the pitcher's *resolution* profile matter, or is the pitcher fully expressed by leverage?~~ **ANSWERED in §9: resolution is ~90% of a pitcher and leverage ~10%.** Pitcher cards get *harder*, not simpler, and generic pitcher resolution cards are far from lossless.
 - How much of a hitter's leverage tendency is a real skill versus noise? Worth a split-half correlation before committing to per-player leverage cards.
+
+---
+
+## 9. Where identity lives — and the architecture it forces
+
+Added after the first paper playtest. The batters felt right; **the pitcher did not feel
+unique**, and the table asked two questions the design had no answer for: why is the pitcher's
+leverage roll printed on the batter's card, and does every batter need a separate card against
+every pitcher?
+
+They are one question, and the answer changes the architecture.
+
+### The measurement
+
+Each player's contribution splits into two channels — **leverage** (how often he wins the first
+two pitches) and **resolution** (what happens once the count is set). Holding the opponent at
+league average and measuring the spread across 105 qualified starters and 160 qualified batters,
+in wOBA:
+
+| | full | leverage only | resolution only |
+|---|---|---|---|
+| **pitchers** | 2.23pp | **0.48pp** | **2.02pp** |
+| batters | 2.27pp | 0.44pp | 2.20pp |
+
+**Resolution carries ~90% of a player. Leverage carries ~10%.** The basic loop handed the
+pitcher only the leverage roll, so it handed him a tenth of himself.
+
+The sharpest case: **Paul Skenes reaches BEHIND 21.6% of the time against a league-average
+batter. The league rate is 21.3%.** By leverage alone the best pitcher in baseball is
+indistinguishable from a replacement arm; his identity is entirely in resolution (.271 wOBA
+against Kochanowicz's .351). Skubal at 30.0% is the rare pitcher whose leverage really is his
+game — which is why he cannot be the model for all of them.
+
+**The reframe that matters: leverage is a *style* channel, resolution is a *quality* channel.**
+That is precisely why the batters felt right and the pitcher did not. Hoerner versus Happ is a
+difference of style, and leverage shows it beautifully. Ace versus rookie is a difference of
+quality, and leverage cannot see it at all.
+
+### Why the roll was on the batter's card
+
+Because `getCountCards(batter, pitcher)` fuses both sides through log5 into one object. It was
+never a batter card — **it is a matchup card**, and labelling it with the batter's name was a
+convenience that misled the table. The same fact is the whole of the combinatorics problem: one
+card per (batter, pitcher) pair is 9 × N.
+
+### What decomposes, and what refuses to
+
+Four ways of splitting a matchup card back into a batter card plus a pitcher card, each fitted
+per pitcher and scored over 2,500 real batter × pitcher pairs:
+
+| Architecture | Cards | Result |
+|---|---|---|
+| **Leverage — generic strip + one additive grade** | 9 + N | **mean Δ 0.0037 wOBA, max 0.0150** ✅ |
+| Resolution — one additive grade | 9 + N | mean Δ 0.0144, max 0.0743 ❌ |
+| Resolution — split read (Strat's move) | 9 + N | ordering holds (r = 0.969), **only 55% of spread** ❌ |
+| Resolution — four per-bucket grades | 9 + N | full spread, but r falls to 0.792 ❌ |
+
+**Leverage decomposes cleanly; resolution refuses to.** Leverage grades run −7 to +6 boxes and
+the approximation sits comfortably inside the project's 2pp bar. Nothing works for resolution:
+the split read collapses the matchup range from .233–.450 to .265–.378, turning the best
+matchup in baseball into a merely good one — the exact "flattens PCA into Hoerner" failure the
+brief calls fatal. The per-bucket grade keeps the range but shuffles which matchup gets which
+value, which is worse, not better.
+
+Worth noting because it reverses a premise: the brief's §5 rejected Strat's split read on the
+grounds that "log5 already says pitcher and batter do not always matter equally." They matter
+**almost exactly equally** — 2.23pp against 2.27pp. The split read is defensible on those
+grounds after all; it fails on fidelity instead.
+
+### The architecture
+
+1. **The leverage strip moves onto the pitcher's card**, printed as nine rows, one per lineup
+   slot. He rolls on his own card. This is pure relocation — the numbers are identical, the
+   log5 fusion is unchanged — but it answers the table's complaint and gives the pitching seat
+   something to hold.
+2. **The batter's card keeps resolution only**, and stays matchup-specific, because resolution
+   is the channel that cannot be factored without losing half the personality.
+3. **Therefore this is a series-set game, not a season-set game.** Playing CHC at MIL means
+   printing nine Cubs cards against Peralta and nine Brewers cards against Boyd — eighteen
+   cards, about five sheets, generated in a second. That is fine for a game night and impossible
+   for a 162-game replay. Decide it deliberately rather than discovering it later.
+
+A permanent season set remains available at a known price: the split read, 9 + N cards forever,
+ordering intact and magnitude halved. That is the Strat bargain, stated honestly.

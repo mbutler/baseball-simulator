@@ -9,7 +9,9 @@
     "monte-carlo": "bun run src/scripts/monteCarloValidate.ts",
     "monte-carlo-league": "bun run src/scripts/monteCarloValidate.ts 400 --multi",
     "fetch-count-data": "bun run src/scripts/fetchCountData.ts",
-    "build-count-profiles": "bun run src/scripts/buildCountProfiles.ts"
+    "build-count-profiles": "bun run src/scripts/buildCountProfiles.ts",
+    "shift-policy": "bun run src/scripts/shiftPolicySim.ts",
+    "print-cards": "bun run src/scripts/printCards.ts"
   },
   "devDependencies": {
     "documentation": "^14.0.3"
