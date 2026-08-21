@@ -56,6 +56,10 @@ const MIN_START_SHARE = 0.7;
 const MIN_STAFF_TBF = 40;
 /** Headroom over a reliever's typical outing before he fades. */
 const RELIEF_HEADROOM = 1;
+/** Batters a starter faces in a game, and the wOBA-to-runs divisor. Used only to
+ *  restate the generic-page error as runs, which a baseball fan can read. */
+const STARTER_BF = 25, WOBA_SCALE = 1.2;
+const runsOf = (dWoba: number) => dWoba / WOBA_SCALE * STARTER_BF;
 /** Observed pure-starter range was 15–20; clamp with a little headroom. */
 const ENDURANCE_MIN = 13, ENDURANCE_MAX = 21;
 
@@ -240,8 +244,8 @@ function pitcherPageHtml(team: string, year: string, lines: PitcherLine[]): stri
       <td class="num">${p.grade >= 0 ? '+' : ''}${p.grade}</td>
       <td class="num">${p.era.toFixed(2)}</td>
       <td class="num">${p.fip.toFixed(2)}</td>
-      <td class="num">${p.err.toFixed(4)}</td>
-      <td class="ov">${needs ? 'PRINT OVERLAY' : 'generic OK'}</td></tr>`;
+      <td class="num">${runsOf(p.err).toFixed(2)}</td>
+      <td class="ov">${needs ? 'PRINT OVERLAY' : 'standard is fine'}</td></tr>`;
   }).join('');
 
   const penRows = pen.map(p => `<tr>
@@ -255,16 +259,16 @@ function pitcherPageHtml(team: string, year: string, lines: PitcherLine[]): stri
   return `
     <section class="blk wide">
       <header><h3>${esc(team)} ${year} — rotation</h3>
-        <div class="meta">roll d100, add GRADE, read the batter's leverage strip</div></header>
+        <div class="meta">roll two dice, add GRADE, read the batter's strip · "off by" is runs per game</div></header>
       <table class="pit">
         <thead><tr><th class="pn">starter</th><th>END</th><th>GRADE</th><th>ERA</th><th>FIP</th>
-          <th>gen. Δ wOBA</th><th class="ov">generic page</th></tr></thead>
+          <th>off by</th><th class="ov">standard page</th></tr></thead>
         <tbody>${rotRows}</tbody>
       </table>
     </section>
     <section class="blk wide">
       <header><h3>${esc(team)} ${year} — bullpen</h3>
-        <div class="meta">no overlay needed, ever — see below</div></header>
+        <div class="meta">the standard page always fits a reliever — see front matter</div></header>
       <table class="pit">
         <thead><tr><th class="pn">reliever</th><th>END</th><th>GRADE</th><th>ERA</th><th>G</th><th>IP</th></tr></thead>
         <tbody>${penRows}</tbody>
@@ -285,48 +289,76 @@ function pitcherPageHtml(team: string, year: string, lines: PitcherLine[]): stri
 
 const RULES_PAGE = `
     <section class="blk wide">
-      <header><h3>The plate appearance</h3><div class="meta">two rolls, two decisions, in order</div></header>
+      <header><h3>How to play</h3><div class="meta">everything you need is on these two pages</div></header>
+      <p class="note"><strong>You need:</strong> this binder, two ten-sided dice read together as 1–100,
+      and a pencil.</p>
+      <p class="note"><strong>The one surprise:</strong> you never count balls and strikes. A single roll
+      settles how the first few pitches went, and that is the whole count.</p>
       <ol class="rules">
-        <li><strong>Pitcher rolls LEVERAGE</strong> (d100), adds his GRADE, and announces the number.</li>
-        <li>The batting manager reads it on his own batter's strip → EARLY / AHEAD / EVEN / BEHIND.</li>
-        <li><strong>Pitcher decides</strong> whether to spend stamina to shift one rung toward himself.</li>
-        <li><strong>Batter declares</strong> protect or dead-red, then <strong>rolls RESOLUTION</strong> (d100) on that row.</li>
+        <li><strong>The pitcher rolls</strong> 1–100 and adds his GRADE — the small plus or minus on his
+        staff page. He says the total out loud.</li>
+        <li><strong>The batting manager reads that number</strong> on his hitter's strip, the four boxes
+        across the top of the card. It lands on EARLY, AHEAD, EVEN or BEHIND. That is how the at-bat is
+        going.</li>
+        <li><strong>The pitcher may bear down</strong> — spend stamina to drag the at-bat one box his way
+        (AHEAD→EVEN, or EVEN→BEHIND). It costs him: every point spent is a batter off his outing. Skip
+        this on EARLY.</li>
+        <li><strong>The batter picks an approach and rolls.</strong> PROTECT or DEAD-RED, then 1–100 on
+        that row of his card. Read across to the outcome.</li>
       </ol>
-      <p class="note"><strong>EARLY skips steps 3 and 4's choice</strong> — the ball is already in play. Roll the EARLY row and move on.</p>
-      <p class="note">Nothing tracks balls and strikes. AHEAD / EVEN / BEHIND is the whole count state; a full count is already resolved inside the columns.</p>
-      <p class="note"><strong>Protect</strong> trades power for contact, <strong>dead-red</strong> the reverse. They are worth the same on average, so the situation decides. Dead-red on BEHIND is indefensible.</p>
-      <p class="note">Neither manager leaves his own team's section. The pitcher announces his number; the batting manager reads it.</p>
+      <p class="note"><strong>An at-bat, start to finish.</strong> Peralta faces Crow-Armstrong. Peralta
+      rolls 63, adds his +5, and says "68." PCA's strip shows 39–75 is EVEN, so the at-bat is even. There
+      is a runner on second with two out, so Peralta spends 1 stamina to make it BEHIND. Now PCA has to
+      protect — swinging for the fences down 0-2 against Peralta is asking to strike out. He rolls 88 on
+      the BEHIND / protect row: groundout. Inning over. Peralta marks two boxes on his track, one for the
+      batter and one for the stamina.</p>
+      <p class="note"><strong>The four boxes.</strong>
+      <strong>EARLY</strong> — he jumped on an early pitch and it is already in play, so there is no
+      bearing down and no approach to choose; just roll. About a quarter of all at-bats, and the best
+      contact in baseball.
+      <strong>AHEAD</strong> — hitter's count: walks and damage.
+      <strong>EVEN</strong> — the ordinary at-bat, the most common one, and where your choices matter most.
+      <strong>BEHIND</strong> — pitcher's count: strikeouts everywhere.</p>
+    </section>`;
+
+const PITCHING_PAGE = `
+    <section class="blk wide">
+      <header><h3>What the words mean</h3><div class="meta">read once, then ignore</div></header>
+      <dl class="gloss">
+        <dt>LEVERAGE strip</dt><dd>The four boxes on top of a batter's card. Where the pitcher's roll lands.</dd>
+        <dt>RESOLUTION</dt><dd>The seven rows underneath — what actually happened.</dd>
+        <dt>PROTECT</dt><dd>Choke up and shorten the swing. Fewer strikeouts, less power. Best when a ball
+          in play scores a run: runner on third with under two out, or on second with two out.</dd>
+        <dt>DEAD-RED</dt><dd>Sitting on a fastball. More home runs, more strikeouts. Best with the bases
+          empty, or down late when a single will not help. <em>Neither approach is better on average —
+          that is deliberate. The situation is what decides.</em></dd>
+        <dt>GRADE</dt><dd>How good a pitcher is at getting ahead of hitters. Added to his roll. Runs about
+          −7 to +6.</dd>
+        <dt>ENDURANCE</dt><dd>How many batters he is good for. Pencil a tick per batter faced, and one more
+          per stamina point spent. Past the number, he is TIRED.</dd>
+        <dt>TIRED</dt><dd>Every roll from here slides one box toward the hitter, and he cannot bear down any
+          more. Time to go to the bullpen.</dd>
+        <dt>Stamina</dt><dd>There are no chips to hand out. Bearing down simply burns ENDURANCE faster — a
+          starter's whole budget is his start, and nothing refills.</dd>
+        <dt>Changing pitchers</dt><dd>Before any batter. The new man starts a fresh track. Whoever leaves is
+          out for good, and your bullpen page is all you have.</dd>
+        <dt>"off by"</dt><dd>How far the standard page misses this particular pitcher, in runs per game.
+          Under about 0.3 you would never notice it across a game. Over that, the page says PRINT OVERLAY.</dd>
+        <dt>OVERLAY</dt><dd>A replacement page for a lineup, built against one specific pitcher. Aces and
+          disasters are far enough from ordinary that a standard page flatters the ace and punishes the
+          scuffler; the overlay puts it right. <strong>Relievers never need one</strong> — they face about
+          four hitters, so even a bad miss is worth a fifth of a run.</dd>
+      </dl>
+      <p class="note"><strong>Why ENDURANCE looks small for relievers.</strong> A starter's number is where
+      he starts to fade, not where he gets pulled — real starters usually finish while tired. A reliever is
+      taken out at his limit instead, so his number sits just above a normal outing. A closer at 5 is good
+      for a clean inning with a little left to bear down with, and fades if the inning goes long.</p>
+      <p class="note"><span class="est">est</span> beside an ENDURANCE means the pitcher both started and
+      relieved that year, so neither measure fits him cleanly and the figure is a rough one.</p>
     </section>`;
 
 const NOTES_BLOCK = '<section class="blk wide"><header><h3>Notes</h3>' +
   '<div class="meta">scoring, lineups, house rules</div></header></section>';
-
-const PITCHING_PAGE = `
-    <section class="blk wide">
-      <header><h3>Pitching — the parts that need explaining</h3>
-        <div class="meta">read once; the working rules are on each staff page</div></header>
-      <p class="note"><strong>ENDURANCE means different things by role.</strong> For a starter it is a
-      <em>fade</em> point that arrives before he is pulled — the league median is 23.1 batters faced per
-      start against an 18-batter fade, so starters routinely finish while tired. A reliever is pulled at
-      his limit rather than past it, so his endurance sits just above a normal outing: the median reliever
-      faces 4.1 batters, hence 5. That hands him proportionally more stamina to spend than a starter gets,
-      which is right — relievers air it out.</p>
-      <p class="note"><strong>Why relievers never need an overlay.</strong> A generic page misreads a
-      pitcher by up to 0.052 wOBA. Across the 25 batters a starter faces that is a run a game, which is why
-      the rotation carries a flag. A reliever faces about four, where the same error is worth
-      <strong>0.17 runs</strong> — below noticing. Print the bullpen once and it is done forever.</p>
-      <p class="note"><strong>PRINT OVERLAY</strong> on a starter means a generic page misrepresents him by
-      more than ${OVERLAY_THRESHOLD} wOBA. Generate the matchup pages with
-      <code>print-cards game &lt;team-a&gt; &lt;team-b&gt; --sp1 &lt;name&gt; --sp2 &lt;name&gt;</code>
-      and slot them into the batting team's section.</p>
-      <p class="note"><span class="est">est</span> beside an ENDURANCE means the pitcher split his season
-      between starting and relieving, so neither batters-per-start nor batters-per-outing describes him
-      cleanly; the figure is the rougher of the two.</p>
-      <p class="note"><strong>Changing pitchers.</strong> Before any plate appearance. The reliever starts a
-      fresh track at zero. A pitcher who leaves does not return, and the bullpen on your staff page is all
-      you have — that finite list is the only thing rationing changes, so spending a reliever early is a
-      real decision.</p>
-    </section>`;
 
 const CSS = `
   *{box-sizing:border-box}
@@ -373,6 +405,9 @@ const CSS = `
   .rules{margin:6px 0 0;padding-left:16px}
   .rules li{margin-bottom:2px}
   .note{margin:5px 0 0;color:#444;font-size:10px}
+  dl.gloss{margin:4px 0 0;display:grid;grid-template-columns:118px 1fr;gap:2px 10px;font-size:10px}
+  dl.gloss dt{font-weight:700;text-align:right;color:#222}
+  dl.gloss dd{margin:0;color:#333}
   code{font:10px ui-monospace,Menlo,Consolas,monospace;background:#f2f2f0;padding:1px 3px;border-radius:2px}
   @page{size:letter portrait;margin:0.5in 0.5in 0.55in 0.9in}
   @page :left{margin:0.5in 0.9in 0.55in 0.5in}
@@ -542,7 +577,7 @@ async function main(): Promise<void> {
         const chunk = lineup.slice(i, i + BATTERS_PER_PAGE);
         const body = chunk.map(b => {
           const cc = getCountCards(tallyFor(profiles, 'batters', b.player_id, team), null, profiles);
-          return batterBlockHtml(b, posOf(b, team), cc.leverage, cc.resolution, 'generic — any pitcher');
+          return batterBlockHtml(b, posOf(b, team), cc.leverage, cc.resolution, 'standard — any pitcher');
         }).join('');
         pages.push({ team, section: `batters ${i + 1}–${i + chunk.length}`, body });
       }
