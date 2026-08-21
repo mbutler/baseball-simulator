@@ -329,16 +329,22 @@ pitcher rows are now audited against the dataset on every full-league build.
 5. **Decide on the scraped-HTML history rewrite.** See the note in §5 — the pages are untracked
    going forward but still present in history. Either accept that, or plan a `git filter-repo`
    pass and force-push at a moment when no other machine has outstanding work.
-6. **Incremental writes in the fetcher — and add `bb_type` in the same pass.**
-   `fetchSeason()` currently writes `pa-<year>.csv` once, after all ~50 chunks. A crash at
-   chunk 45 loses the entire run. Write per chunk and resume from what is already cached.
-   **While the fetcher is open, add `bb_type` to the requested Savant columns**
-   ([`fetchCountData.ts:138`](../src/scripts/fetchCountData.ts)) and carry it into the cache as
-   a 7th field. It is the only thing standing between the game and per-hitter out types, and
-   pulling it now makes this one season re-fetch instead of two — see the fractal-detail
-   subsection in §3.
+6. ~~**Incremental writes in the fetcher — and add `bb_type` in the same pass.**~~ **DONE.**
+   The fetcher writes per chunk against a `.progress` marker and resumes from it, and discards a
+   cache whose header predates a schema change rather than mixing schemas. `bb_type` is carried
+   as a 7th field. The refetch returned **182,840 PA — the same count as before** — and the
+   rebuilt profiles reproduce the §2 bucket table and the 0.91pp calibration exactly, which is
+   the regression check that the added column changed nothing else. **99.3% of outs carry a
+   batted-ball class.**
 
-### Design — before building the card generator
+   **What it bought, and what it did not.** League out-type shares come out **47.0% GB / 29.4% FB
+   / 13.2% LD / 10.4% POP**, against the 48/32/12/8 that `describeOutcome.ts` had been guessing —
+   the original estimate was good. But **out type barely separates hitters**: across 113 batters
+   with 250+ tallied outs, the grounder allocation is 4 or 5 boxes of 10 for **94% of them**, with
+   one hitter at 3 and six at 6. Michael Harris II and Yandy Díaz sit at the top, Cal Raleigh at
+   the bottom, and everyone else prints one of two lines. Out type earns its place by *unlocking
+   the fielding module* (§10), not by adding personality — the same shape as ENDURANCE in §7.8:
+   genuinely derived, effectively coarse, because the sport is.
 
 7. **Play three innings on paper.** (The economy no longer needs the table's help — see
    item 8's validation. What is left for paper is whether the decision is *interesting*, not
@@ -580,3 +586,63 @@ grounds after all; it fails on fidelity instead.
 
 A permanent season set remains available at a known price: the split read, 9 + N cards forever,
 ordering intact and magnitude halved. That is the Strat bargain, stated honestly.
+
+---
+
+## 10. Fielding — a decision layer, not a simulation layer
+
+Added after the second playtest, where the batting felt good and the fielding felt absent.
+
+The diagnosis was not missing detail. **The fielding manager had no decision.** The pitcher
+chooses whether to spend stamina, the batter chooses protect or dead-red, and the defence chose
+nothing — so defence could not feel like anything, however much detail were added.
+
+### The constraint that shapes the mechanic
+
+The ones digit of the resolution roll is **already spent** naming the batted-ball type (§3). It
+cannot be re-read for a second question: a double-play check on the same digit would correlate
+the two badly enough to make 60% of grounders double plays.
+
+So the special cases get **their own boxes inside the same digit**:
+
+```
+OUTS — ones digit:  0 DP · 1-3 GB · 4 THRU · 5-7 FB · 8 LD · 9 POP
+```
+
+- **DP** — a grounder that is a double play, with a runner on first and fewer than two out.
+- **THRU** — a grounder that gets through **for a single with the infield IN**, and is an
+  ordinary out with the infield **BACK**.
+
+**THRU is the mechanic.** The same box means different things depending on what the fielding
+manager declared, which makes the declaration a decision rather than a lookup. Both special
+boxes degrade to ordinary grounders when their situation is not on the board, so the basic game
+never notices them and the page can be added or dropped mid-game.
+
+`INFIELD IN or BACK` is declared with a runner on third and fewer than two out — after the
+pitcher's stamina decision, before the batter's approach, because the defence sets up and the
+hitter reacts. BACK concedes the run for the out; IN holds the runner but lets THRU through.
+
+The hit case reuses the digit that does nothing on a hit: **0–6 the runner holds, 7–9 he takes
+the extra base.**
+
+### Where the line is
+
+**In:** anything readable off the roll already made, plus at most one binary declaration —
+double plays, sacrifice flies, the infield-in gamble, runners taking an extra base, errors.
+
+**Out:** rundowns, relays and cutoffs, defensive shifts, per-position fielder ratings consulted
+every play. All of them need sequencing or alignment state, and tracking where the shortstop is
+standing is a different game.
+
+### The caveat worth stating
+
+Fielding will never carry personality the way hitters do, and that is true of baseball rather
+than a defect in the design. A plate appearance is a duel between two named men; a ground ball
+is diffuse, and goes to whoever it goes to. Expect a **team-level defensive number** nudging the
+DP and advancement thresholds, the way a pitcher's GRADE nudges leverage — not nine fielders
+with cards. The real exceptions are catcher arm on steals and a handful of elite gloves, and
+both are one printed number.
+
+**Still a prototype.** DP and THRU are one box each; those are the tuning knobs for how often the
+infield-in gamble bites, and the numbers to argue with after a few games. Runner speed does not
+yet modify the advance band.

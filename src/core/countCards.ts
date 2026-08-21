@@ -26,8 +26,16 @@ export type Bucket = (typeof BUCKETS)[number];
 export const OUTCOMES = ['K', 'BB', 'HBP', 'HR', '1B', '2B', '3B', 'Out'] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 
+/** Batted-ball classes for the out-type line, in printed order. */
+export const OUT_TYPES = ['GB', 'FB', 'LD', 'POP'] as const;
+export type OutType = (typeof OUT_TYPES)[number];
+
 /** Raw tallies as written by buildCountProfiles.ts. */
-export interface Tally { PA: number; buckets: number[]; outcomes: number[][] }
+export interface Tally {
+  PA: number; buckets: number[]; outcomes: number[][];
+  /** Absent in profile files built before batted-ball data was fetched. */
+  outTypes?: number[];
+}
 export interface CountProfiles {
   metadata: Record<string, unknown>;
   league: Tally;
@@ -41,6 +49,8 @@ export interface CountProfiles {
  */
 export const PRIOR_LEVERAGE = 100;
 export const PRIOR_RESOLUTION = 60;
+/** Out types are observed only on balls in play, so a full season is a few hundred. */
+export const PRIOR_OUT_TYPE = 120;
 
 export interface CountCards {
   /** Roll 1: P(bucket). Sums to 1. */
@@ -113,6 +123,31 @@ export function getCountCards(
     resolution,
     blended
   };
+}
+
+/**
+ * The batter's out-type mix, shrunk toward league and combined with the pitcher's
+ * the same way everything else is. Groundball pitchers are real, so the pitcher
+ * belongs here; pass null for the generic card.
+ *
+ * Returns null when the profile file predates batted-ball data, so callers can
+ * print the league line rather than silently inventing a personal one.
+ */
+export function getOutTypes(
+  batterTally: Tally | null,
+  pitcherTally: Tally | null,
+  profiles: CountProfiles
+): number[] | null {
+  const lg = profiles.league.outTypes;
+  if (!lg || lg.reduce((a, b) => a + b, 0) === 0) return null;
+  const leagueRow = normalize(lg);
+  const row = (t: Tally | null): number[] => {
+    const counts = t?.outTypes;
+    const n = counts ? counts.reduce((a, b) => a + b, 0) : 0;
+    return shrunkRow(counts ?? lg, n, leagueRow, PRIOR_OUT_TYPE);
+  };
+  const b = row(batterTally), p = row(pitcherTally);
+  return normalize(OUT_TYPES.map((_, i) => log5(b[i], p[i], leagueRow[i])));
 }
 
 /** Look up a player's tally by the `<player_id>|<TEAM>` key the profile file uses. */
@@ -189,4 +224,55 @@ export function applyApproach(base: AtBatProbabilities, approach: Approach): AtB
     if (wobaOf(build(mid)) > target) hi = mid; else lo = mid;
   }
   return build((lo + hi) / 2);
+}
+
+/** Fallback when the profile file predates batted-ball data. */
+export const LEAGUE_OUT_TYPE_LINE = '0-4 GB · 5-7 FB · 8 LD · 9 POP';
+
+/**
+ * The ones digit of the resolution roll, split into batted-ball classes — a layer
+ * that costs no extra die because the digit was already rolled.
+ *
+ * Two grounder boxes are special, and both degrade to ordinary grounders when
+ * their conditions do not apply, so the basic game never notices them:
+ *
+ *   DP    a grounder that is a double play, if a runner is on first with
+ *         fewer than two out
+ *   THRU  a grounder that gets through for a single with the infield IN, and
+ *         is an ordinary out with the infield BACK
+ *
+ * THRU is what makes the defensive declaration matter: the same box means
+ * different things depending on what the fielding manager said, which is a
+ * decision rather than a lookup. A sub-roll could not do this — the digit is
+ * already spent naming the batted-ball type, so re-reading it for a second
+ * question would correlate the two badly.
+ */
+export function outTypeLine(dist: number[] | null): string {
+  if (!dist) return LEAGUE_OUT_TYPE_LINE;
+  const raw = dist.map(v => v * 10);
+  const n = raw.map(Math.floor);
+  const short = 10 - n.reduce((a, b) => a + b, 0);
+  raw.map((v, i) => ({ i, f: v - n[i] })).sort((a, b) => b.f - a.f)
+    .slice(0, Math.max(0, short)).forEach(({ i }) => n[i]++);
+
+  const gb = n[0];
+  const dp = gb >= 2 ? 1 : 0;
+  const thru = gb >= 3 ? 1 : 0;
+  const plain = gb - dp - thru;
+
+  const parts: string[] = [];
+  let lo = 0;
+  const push = (count: number, label: string) => {
+    if (count <= 0) return;
+    const hi = lo + count - 1;
+    parts.push(`${lo === hi ? lo : `${lo}-${hi}`} ${label}`);
+    lo = hi + 1;
+  };
+  // Labels must not contain the separator: 'GB·DP' beside ' · ' is ambiguous to
+  // read and to parse. DP and THRU are grounders; the fielding page says so.
+  push(dp, 'DP');
+  push(plain, 'GB');
+  push(thru, 'THRU');
+  for (let i = 1; i < OUT_TYPES.length; i++) push(n[i], OUT_TYPES[i]);
+  return parts.join(' · ');
 }

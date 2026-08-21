@@ -100,14 +100,25 @@ async function loadCrosswalk(): Promise<Map<string, string>> {
   return map;
 }
 
-type Tally = { PA: number; buckets: number[]; outcomes: number[][] };
+/** Batted-ball classes, in the order they are stored and printed. */
+const OUT_TYPES = ['GB', 'FB', 'LD', 'POP'] as const;
+const BB_INDEX: Record<string, number> = { G: 0, F: 1, L: 2, P: 3 };
+
+type Tally = { PA: number; buckets: number[]; outcomes: number[][]; outTypes: number[] };
 const newTally = (): Tally => ({
   PA: 0,
   buckets: BUCKETS.map(() => 0),
-  outcomes: BUCKETS.map(() => OUTCOMES.map(() => 0))
+  outcomes: BUCKETS.map(() => OUTCOMES.map(() => 0)),
+  outTypes: OUT_TYPES.map(() => 0)
 });
-function add(t: Tally, b: number, o: number) {
+/**
+ * `bb` is the batted-ball class of the terminal pitch, empty when the PA never put
+ * a ball in play. Only outs are tallied: the card's ones-digit line reads off the
+ * Out band, so a hitter's grounder-on-a-single is not what it describes.
+ */
+function add(t: Tally, b: number, o: number, bb: string, isOut: boolean) {
   t.PA++; t.buckets[b]++; t.outcomes[b][o]++;
+  if (isOut && bb && BB_INDEX[bb] !== undefined) t.outTypes[BB_INDEX[bb]]++;
 }
 
 async function main() {
@@ -149,13 +160,15 @@ async function main() {
   for (let i = 1; i < rows.length; i++) {
     const line = rows[i];
     if (!line) continue;
-    const [batter, pitcher, batTeam, fldTeam, pathStr, outcome] = line.split(',');
+    const [batter, pitcher, batTeam, fldTeam, pathStr, outcome, bb] = line.split(',');
     if (!outcome) continue;
     const b = bIdx[bucketOf(pathStr)];
     const o = oIdx[outcome as Outcome];
     if (o === undefined) continue;
+    const isOut = outcome === 'Out';
+    const bbc = (bb ?? '').trim();
     totalPA++;
-    add(league, b, o);
+    add(league, b, o, bbc, isOut);
 
     const bSlug = crosswalk.get(batter);
     const pSlug = crosswalk.get(pitcher);
@@ -163,7 +176,7 @@ async function main() {
     if (bSlug && repoKeys.has(`${bSlug}|${batTeam}`)) {
       const key = `${repoSlugToId.get(bSlug)}|${batTeam}`;
       let t = batters.get(key); if (!t) batters.set(key, t = newTally());
-      add(t, b, o); matchedBat++;
+      add(t, b, o, bbc, isOut); matchedBat++;
     } else {
       unmatched.set(bSlug ?? `mlbam:${batter}`, (unmatched.get(bSlug ?? `mlbam:${batter}`) ?? 0) + 1);
     }
@@ -171,7 +184,7 @@ async function main() {
     if (pSlug && repoKeys.has(`${pSlug}|${fldTeam}`)) {
       const key = `${repoSlugToId.get(pSlug)}|${fldTeam}`;
       let t = pitchers.get(key); if (!t) pitchers.set(key, t = newTally());
-      add(t, b, o); matchedPit++;
+      add(t, b, o, bbc, isOut); matchedPit++;
     } else {
       const k = pSlug ?? `mlbam:${pitcher}`;
       unmatchedPit.set(k, (unmatchedPit.get(k) ?? 0) + 1);
@@ -184,7 +197,7 @@ async function main() {
       source: 'Baseball Savant (Statcast) pitch-level data, regular season only',
       pivot: 'count faced on the 3rd pitch; PAs ending in <=2 pitches are "early"',
       note: 'Raw counts, not rates. Shrinkage and log5 are applied in probabilityModel.',
-      bucketOrder: BUCKETS, outcomeOrder: OUTCOMES,
+      bucketOrder: BUCKETS, outcomeOrder: OUTCOMES, outTypeOrder: OUT_TYPES,
       totalPA,
       batterMatchRate: Number((matchedBat / totalPA).toFixed(4)),
       pitcherMatchRate: Number((matchedPit / totalPA).toFixed(4)),

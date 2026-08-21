@@ -33,6 +33,7 @@ import { loadTeamFile, loadDataset } from '../utils/dataLoader.js';
 import {
   getCountCards, tallyFor, applyApproach, BUCKETS, OUTCOMES
 } from '../core/countCards.js';
+import { getOutTypes, outTypeLine } from '../core/countCards.js';
 import type { Bucket, CountProfiles, Tally } from '../core/countCards.js';
 import type { AtBatProbabilities } from '../core/probabilityModel.js';
 import type { NormalizedBatter, NormalizedPitcher } from '../types/baseball.js';
@@ -43,7 +44,6 @@ import path from 'path';
 const MEDIAN_BF_PER_START = 23.1;
 const ENDURANCE_SCALE = 18 / MEDIAN_BF_PER_START;
 const SHIFT_COST = { AHEAD: 2, EVEN: 1 };
-const OUT_TYPE_LINE = '0-4 GB · 5-7 FB · 8 LD · 9 POP';
 /** Three resolution tables fit a Letter page at print size with the strip above each. */
 const BATTERS_PER_PAGE = 3;
 /** Mean |Δ| wOBA above which a generic page misrepresents a pitcher enough to reprint (§9). */
@@ -120,7 +120,7 @@ const handOf = (n: string) => n.includes('*') ? 'L' : n.includes('#') ? 'S' : 'R
 function batterBlockHtml(
   b: NormalizedBatter, pos: string,
   leverage: Record<Bucket, number>, res: Record<Bucket, AtBatProbabilities>,
-  context: string
+  context: string, outTypes: number[] | null
 ): string {
   const who = formatPlayerName(b.name);
   const lev = boxes(BUCKETS.map(x => leverage[x]), `${who} leverage`);
@@ -149,7 +149,7 @@ function batterBlockHtml(
           ${OUTCOMES.map(o => `<th>${o}</th>`).join('')}</tr></thead>
         <tbody>${body}</tbody>
       </table>
-      <div class="foot">OUTS — ones digit of your roll: ${OUT_TYPE_LINE}</div>
+      <div class="foot">OUTS — ones digit of your roll: ${outTypeLine(outTypes)}</div>
     </section>`;
 }
 
@@ -416,6 +416,39 @@ function scoresheetPage(team?: string, lineup?: NormalizedBatter[]): string {
     </section>`;
 }
 
+const FIELDING_PAGE = `
+    <section class="blk wide">
+      <header><h3>Fielding — optional</h3>
+        <div class="meta">one declaration, no extra dice; ignore this page and the game still works</div></header>
+      <p class="note">Everything here reads the <strong>ones digit of the roll you already made</strong>.
+      Nothing needs a second die, and every special box turns back into an ordinary out when its
+      situation is not on the board — so you can add this page mid-game and take it away again.</p>
+      <dl class="gloss">
+        <dt>DP</dt><dd>A grounder that is a double play, if there is a runner on first with fewer than
+          two out. Otherwise just a grounder.</dd>
+        <dt>THRU</dt><dd>A grounder, and the box the defence controls. With the infield <strong>IN</strong>
+          it gets through for a single; with the infield <strong>BACK</strong> it is an ordinary out.</dd>
+        <dt>FB</dt><dd>A fly ball. With a runner on third and fewer than two out, he tags and scores —
+          a sacrifice fly.</dd>
+        <dt>LD / POP</dt><dd>Outs, and nobody advances on either.</dd>
+      </dl>
+      <p class="note"><strong>INFIELD IN or BACK.</strong> The fielding manager declares it whenever there
+      is a runner on third with fewer than two out — after the pitcher decides about stamina, before the
+      batter declares his approach, because the defence sets up and the hitter reacts.
+      <strong>BACK</strong> concedes the run: a grounder is an out and the runner scores.
+      <strong>IN</strong> cuts the run off: on a grounder the runner holds — but THRU now goes to the
+      outfield for a single, and the run scores anyway with nobody out.</p>
+      <p class="note">That is the whole trade, and it is the real one: play in and you are buying a run
+      with the chance of a bigger inning. It is right when the run beats the out — tie game late — and
+      wrong when you simply need outs.</p>
+      <p class="note"><strong>Runners on a hit.</strong> The ones digit does nothing on a hit, so use it:
+      <strong>0–6</strong> the runner holds, <strong>7–9</strong> he takes the extra base — first to third
+      on a single, second to home. There is no throw to resolve; he either went or he did not.</p>
+      <p class="note"><em>Prototype.</em> The DP and THRU boxes are one box each, which is the number
+      to argue with after a few games — they are the tuning knobs for how often the infield-in gamble bites.
+      Runner speed does not modify the advance band yet.</p>
+    </section>`;
+
 const NOTES_BLOCK = '<section class="blk wide"><header><h3>Notes</h3>' +
   '<div class="meta">scoring, lineups, house rules</div></header></section>';
 
@@ -619,7 +652,9 @@ async function main(): Promise<void> {
       const body = chunk.map(b => {
         const cc = getCountCards(
           tallyFor(profiles, 'batters', b.player_id, batCode.split('-')[0]), pitTally, profiles);
-        return batterBlockHtml(b, posOf(b, batCode.split('-')[0]), cc.leverage, cc.resolution, `vs ${spName}`);
+        const bt = tallyFor(profiles, 'batters', b.player_id, batCode.split('-')[0]);
+        return batterBlockHtml(b, posOf(b, batCode.split('-')[0]), cc.leverage, cc.resolution,
+          `vs ${spName}`, getOutTypes(bt, pitTally, profiles));
       }).join('');
       out.push({ team: batCode.split('-')[0], section: `OVERLAY vs ${spName} · ${i + 1}–${i + chunk.length}`, body });
     }
@@ -639,7 +674,8 @@ async function main(): Promise<void> {
       }
     }
     for (let i = 0; i < (copies || (teamCodes.length ? 0 : 4)); i++) {
-      pages.push({ team: 'COUNT GAME', section: 'scoresheet', body: scoresheetPage() });
+      pages.push({ team: 'COUNT GAME', section: 'fielding', body: FIELDING_PAGE });
+    pages.push({ team: 'COUNT GAME', section: 'scoresheet', body: scoresheetPage() });
     }
     if (!pages.length) throw new Error('nothing to print: give teams or --copies N');
   } else if (mode === 'overlay' || mode === 'game') {
@@ -660,6 +696,7 @@ async function main(): Promise<void> {
     pages.push({ team: 'COUNT GAME', section: 'pitching', body: PITCHING_PAGE });
     // One blank scoresheet lives in the binder so a game can start without a
     // second print run; `scoresheet --copies N` makes a stack of them.
+    pages.push({ team: 'COUNT GAME', section: 'fielding', body: FIELDING_PAGE });
     pages.push({ team: 'COUNT GAME', section: 'scoresheet', body: scoresheetPage() });
     for (const code of teamCodes) {
       const team = code.split('-')[0];
@@ -679,8 +716,10 @@ async function main(): Promise<void> {
       for (let i = 0; i < lineup.length; i += BATTERS_PER_PAGE) {
         const chunk = lineup.slice(i, i + BATTERS_PER_PAGE);
         const body = chunk.map(b => {
-          const cc = getCountCards(tallyFor(profiles, 'batters', b.player_id, team), null, profiles);
-          return batterBlockHtml(b, posOf(b, team), cc.leverage, cc.resolution, 'standard — any pitcher');
+          const bt = tallyFor(profiles, 'batters', b.player_id, team);
+          const cc = getCountCards(bt, null, profiles);
+          return batterBlockHtml(b, posOf(b, team), cc.leverage, cc.resolution,
+            'standard — any pitcher', getOutTypes(bt, null, profiles));
         }).join('');
         pages.push({ team, section: `batters ${i + 1}–${i + chunk.length}`, body });
       }

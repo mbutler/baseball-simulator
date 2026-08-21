@@ -20,7 +20,7 @@
  *   bun run src/scripts/fetchCountData.ts 2025 --distill-only
  */
 
-import { mkdir, readFile, writeFile, stat } from 'fs/promises';
+import { mkdir, readFile, writeFile, appendFile, rm, stat } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -126,7 +126,20 @@ async function fetchRange(start: string, end: string, year: string, attempts = 4
 interface PaRow {
   batter: string; pitcher: string;
   batTeam: string; fldTeam: string;
-  path: string; outcome: Outcome;
+  path: string; outcome: Outcome; bb: string;
+}
+
+const PA_HEADER = 'batter,pitcher,batTeam,fldTeam,path,outcome,bb';
+
+/** Statcast batted-ball type, one char. Empty when the PA never put a ball in play. */
+function encodeBbType(v: string | undefined): string {
+  switch ((v ?? '').trim()) {
+    case 'ground_ball': return 'G';
+    case 'fly_ball': return 'F';
+    case 'line_drive': return 'L';
+    case 'popup': return 'P';
+    default: return '';
+  }
 }
 
 /** Collapse pitch rows into one record per plate appearance. */
@@ -135,7 +148,8 @@ function pitchesToPAs(rows: string[][]): PaRow[] {
   const head = rows[0];
   const col = Object.fromEntries(head.map((h, i) => [h.trim(), i]));
   const need = ['game_pk', 'at_bat_number', 'pitch_number', 'balls', 'strikes',
-                'events', 'batter', 'pitcher', 'home_team', 'away_team', 'inning_topbot', 'game_type'];
+                'events', 'batter', 'pitcher', 'home_team', 'away_team', 'inning_topbot', 'game_type',
+                'bb_type'];
   for (const n of need) if (!(n in col)) throw new Error(`Savant CSV missing column: ${n}`);
 
   const groups = new Map<string, string[][]>();
@@ -164,7 +178,8 @@ function pitchesToPAs(rows: string[][]): PaRow[] {
       batTeam: canonTeam(isTop ? first[col.away_team] : first[col.home_team]),
       fldTeam: canonTeam(isTop ? first[col.home_team] : first[col.away_team]),
       path: g.map(r => encodeCount(Number(r[col.balls]), Number(r[col.strikes]))).join(''),
-      outcome
+      outcome,
+      bb: encodeBbType(terminal[col.bb_type])
     });
   }
   return out;
@@ -178,9 +193,29 @@ async function fetchSeason(year: string, chunkDays: number): Promise<string> {
   const seasonStart = new Date(`${year}-03-01T00:00:00Z`);
   const seasonEnd = new Date(`${year}-10-10T00:00:00Z`);
 
-  const lines: string[] = ['batter,pitcher,batTeam,fldTeam,path,outcome'];
+  // Write per chunk and resume from what is already cached: a crash at chunk 45
+  // used to lose the whole run (design doc §7 item 6). The progress marker holds
+  // the next date to fetch; a header mismatch means the cache predates a schema
+  // change, so it is discarded rather than silently mixed.
+  const progFile = `${paFile}.progress`;
   let cursor = seasonStart;
   let chunks = 0;
+  let resumed = false;
+
+  const existingHead = await readFile(paFile, 'utf8')
+    .then(t => t.slice(0, t.indexOf('\n')).trim()).catch(() => null);
+  const savedNext = await readFile(progFile, 'utf8').then(t => t.trim()).catch(() => null);
+
+  if (existingHead === PA_HEADER && savedNext) {
+    cursor = new Date(`${savedNext}T00:00:00Z`);
+    resumed = true;
+    console.log(`↻ Resuming from ${savedNext} (cache header matches)`);
+  } else {
+    if (existingHead && existingHead !== PA_HEADER) {
+      console.log('ℹ️  Cached PA file has an older schema — refetching the season.');
+    }
+    await writeFile(paFile, PA_HEADER + '\n');
+  }
 
   while (cursor <= seasonEnd) {
     let span = chunkDays;
@@ -195,17 +230,22 @@ async function fetchSeason(year: string, chunkDays: number): Promise<string> {
       console.warn(`   ⚠️  ${start}..${end} near the ${SAVANT_ROW_CAP}-row cap — narrowing to ${span}d`);
     }
     const pas = pitchesToPAs(rows);
-    for (const p of pas) lines.push(`${p.batter},${p.pitcher},${p.batTeam},${p.fldTeam},${p.path},${p.outcome}`);
+    if (pas.length) {
+      await appendFile(paFile, pas.map(p =>
+        `${p.batter},${p.pitcher},${p.batTeam},${p.fldTeam},${p.path},${p.outcome},${p.bb}`).join('\n') + '\n');
+    }
     chunks++;
     if (pas.length) {
       console.log(`   ${iso(cursor)}..${iso(addDays(cursor, span - 1))}  ${rows.length - 1} pitches → ${pas.length} PA`);
     }
     cursor = addDays(cursor, span);
+    await writeFile(progFile, iso(cursor));
     await new Promise(r => setTimeout(r, 1200)); // be polite
   }
 
-  await writeFile(paFile, lines.join('\n'));
-  console.log(`\n💾 PA cache: ${paFile} (${lines.length - 1} PA over ${chunks} requests)`);
+  await rm(progFile, { force: true });
+  const total = (await readFile(paFile, 'utf8')).trimEnd().split('\n').length - 1;
+  console.log(`\n💾 PA cache: ${paFile} (${total} PA, ${chunks} requests this run${resumed ? ', resumed' : ''})`);
   return paFile;
 }
 
