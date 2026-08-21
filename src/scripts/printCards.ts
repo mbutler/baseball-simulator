@@ -51,7 +51,11 @@ const COVERAGE_SAMPLE = 50;
 /** Mean batters faced in a relief outing, for netting swingmen's relief work out of BF/GS. */
 const RELIEF_BF = 4.3;
 /** A start-heavy pitcher; below this, BF/GS is too polluted by relief work to use. */
-const MIN_START_SHARE = 0.8;
+const MIN_START_SHARE = 0.7;
+/** Least work a pitcher must have done to earn a line on the staff page. */
+const MIN_STAFF_TBF = 40;
+/** Headroom over a reliever's typical outing before he fades. */
+const RELIEF_HEADROOM = 1;
 /** Observed pure-starter range was 15–20; clamp with a little headroom. */
 const ENDURANCE_MIN = 13, ENDURANCE_MAX = 21;
 
@@ -183,28 +187,52 @@ function coverageError(
   return sum / Math.max(1, sample.length);
 }
 
+type Role = 'starter' | 'reliever';
+
 /**
- * ENDURANCE from batters faced per start. Swingmen are the trap: Ben Brown made
- * 25 appearances and 15 starts, so his raw BF/GS reads 31.5 and he prints as the
- * most durable arm in baseball. Relief work is netted out first, and a pitcher
- * who is not predominantly a starter falls back to the league median rather than
- * being derived from a number that does not mean what it looks like.
+ * ENDURANCE, derived differently by role because the number means different
+ * things. For a starter it is a FADE point that arrives before he is pulled:
+ * the league median is 23.1 BF/start against an 18-batter fade, so starters
+ * routinely finish while tired. A reliever is pulled at his limit rather than
+ * past it, so his endurance sits just above a normal outing — median 4.1
+ * batters, hence 5. That also hands him proportionally more stamina to spend
+ * than a starter gets, which is right: relievers air it out.
+ *
+ * Swingmen are the trap either way. Ben Brown made 25 appearances and 15 starts,
+ * so raw BF/GS read 31.5 and he printed as the most durable arm in baseball.
  */
-function enduranceOf(raw: Record<string, unknown> | undefined): { value: number; estimated: boolean } {
+function enduranceOf(raw: Record<string, unknown> | undefined): {
+  value: number; estimated: boolean; role: Role;
+} {
   const g = Number(raw?.p_g ?? 0), gs = Number(raw?.p_gs ?? 0), bfp = Number(raw?.p_bfp ?? 0);
-  if (gs <= 0 || bfp <= 0 || g <= 0 || gs / g < MIN_START_SHARE) return { value: 18, estimated: true };
-  const perStart = (bfp - RELIEF_BF * (g - gs)) / gs;
-  const scaled = Math.round(perStart * ENDURANCE_SCALE);
-  return { value: Math.min(ENDURANCE_MAX, Math.max(ENDURANCE_MIN, scaled)), estimated: false };
+  if (g <= 0 || bfp <= 0) return { value: 18, estimated: true, role: 'starter' };
+
+  if (gs / g >= MIN_START_SHARE) {
+    const perStart = (bfp - RELIEF_BF * (g - gs)) / gs;
+    const scaled = Math.round(perStart * ENDURANCE_SCALE);
+    return {
+      value: Math.min(ENDURANCE_MAX, Math.max(ENDURANCE_MIN, scaled)),
+      estimated: false, role: 'starter',
+    };
+  }
+  // Relievers and swingmen: endurance tracks a typical outing, plus headroom.
+  const perOuting = Math.round(bfp / g) + RELIEF_HEADROOM;
+  return {
+    value: Math.min(12, Math.max(3, perOuting)),
+    estimated: gs > 0, role: 'reliever',
+  };
 }
 
 interface PitcherLine {
-  name: string; endurance: number; estimated: boolean; grade: number;
-  era: number; fip: number; err: number;
+  name: string; endurance: number; estimated: boolean; role: Role; grade: number;
+  era: number; fip: number; err: number; ip: number; g: number;
 }
 
 function pitcherPageHtml(team: string, year: string, lines: PitcherLine[]): string {
-  const rows = lines.map(p => {
+  const rotation = lines.filter(l => l.role === 'starter');
+  const pen = lines.filter(l => l.role === 'reliever');
+
+  const rotRows = rotation.map(p => {
     const needs = p.err > OVERLAY_THRESHOLD;
     return `<tr class="${needs ? 'flag' : ''}">
       <th class="pn">${esc(formatPlayerName(p.name))}</th>
@@ -216,27 +244,42 @@ function pitcherPageHtml(team: string, year: string, lines: PitcherLine[]): stri
       <td class="ov">${needs ? 'PRINT OVERLAY' : 'generic OK'}</td></tr>`;
   }).join('');
 
+  const penRows = pen.map(p => `<tr>
+      <th class="pn">${esc(formatPlayerName(p.name))}</th>
+      <td class="num"><strong>${p.endurance}</strong></td>
+      <td class="num">${p.grade >= 0 ? '+' : ''}${p.grade}</td>
+      <td class="num">${p.era.toFixed(2)}</td>
+      <td class="num">${p.g}</td>
+      <td class="num">${p.ip.toFixed(0)}</td></tr>`).join('');
+
   return `
     <section class="blk wide">
-      <header><h3>${esc(team)} ${year} — starting pitchers</h3>
+      <header><h3>${esc(team)} ${year} — rotation</h3>
         <div class="meta">roll d100, add GRADE, read the batter's leverage strip</div></header>
       <table class="pit">
-        <thead><tr><th class="pn">pitcher</th><th>END</th><th>GRADE</th><th>ERA</th><th>FIP</th>
+        <thead><tr><th class="pn">starter</th><th>END</th><th>GRADE</th><th>ERA</th><th>FIP</th>
           <th>gen. Δ wOBA</th><th class="ov">generic page</th></tr></thead>
-        <tbody>${rows}</tbody>
+        <tbody>${rotRows}</tbody>
       </table>
+    </section>
+    <section class="blk wide">
+      <header><h3>${esc(team)} ${year} — bullpen</h3>
+        <div class="meta">no overlay needed, ever — see below</div></header>
+      <table class="pit">
+        <thead><tr><th class="pn">reliever</th><th>END</th><th>GRADE</th><th>ERA</th><th>G</th><th>IP</th></tr></thead>
+        <tbody>${penRows}</tbody>
+      </table>
+    </section>
+    <section class="blk wide">
+      <header><h3>Pitching</h3><div class="meta">see the Pitching page in front matter for why</div></header>
       <ul class="rules">
         <li>Track advances <strong>+1 per batter faced</strong>, <strong>+1 more per stamina point spent</strong>.</li>
         <li>Shift one rung toward you: <strong>AHEAD→EVEN costs ${SHIFT_COST.AHEAD}</strong>, <strong>EVEN→BEHIND costs ${SHIFT_COST.EVEN}</strong>. EARLY cannot be shifted.</li>
         <li>Past ENDURANCE → <strong>TIRED</strong>: every later leverage roll shifts one rung toward the hitter.</li>
         <li><strong>A TIRED pitcher may not spend.</strong> Nothing left to bear down with.</li>
-        <li>Nothing refills. The budget is the start.</li>
+        <li><strong>Change pitchers before any plate appearance.</strong> The reliever starts a fresh track at zero. A pitcher who leaves does not return, and the bullpen above is all you have — that is the only thing rationing changes.</li>
+        <li>Nothing refills. A starter's budget is his start; a reliever's is his outing.</li>
       </ul>
-      <p class="note"><span class="est">est</span> ENDURANCE means the pitcher was not predominantly a starter,
-      so batters-faced-per-start does not describe him; the league median is used instead.</p>
-      <p class="note"><strong>PRINT OVERLAY</strong> means a generic page misrepresents this pitcher by more than
-      ${OVERLAY_THRESHOLD} wOBA — roughly half a run a game. Run
-      <code>print-cards overlay &lt;batting-team&gt; ${esc(team)}-${year}</code> and slot those pages in.</p>
     </section>`;
 }
 
@@ -257,6 +300,33 @@ const RULES_PAGE = `
 
 const NOTES_BLOCK = '<section class="blk wide"><header><h3>Notes</h3>' +
   '<div class="meta">scoring, lineups, house rules</div></header></section>';
+
+const PITCHING_PAGE = `
+    <section class="blk wide">
+      <header><h3>Pitching — the parts that need explaining</h3>
+        <div class="meta">read once; the working rules are on each staff page</div></header>
+      <p class="note"><strong>ENDURANCE means different things by role.</strong> For a starter it is a
+      <em>fade</em> point that arrives before he is pulled — the league median is 23.1 batters faced per
+      start against an 18-batter fade, so starters routinely finish while tired. A reliever is pulled at
+      his limit rather than past it, so his endurance sits just above a normal outing: the median reliever
+      faces 4.1 batters, hence 5. That hands him proportionally more stamina to spend than a starter gets,
+      which is right — relievers air it out.</p>
+      <p class="note"><strong>Why relievers never need an overlay.</strong> A generic page misreads a
+      pitcher by up to 0.052 wOBA. Across the 25 batters a starter faces that is a run a game, which is why
+      the rotation carries a flag. A reliever faces about four, where the same error is worth
+      <strong>0.17 runs</strong> — below noticing. Print the bullpen once and it is done forever.</p>
+      <p class="note"><strong>PRINT OVERLAY</strong> on a starter means a generic page misrepresents him by
+      more than ${OVERLAY_THRESHOLD} wOBA. Generate the matchup pages with
+      <code>print-cards game &lt;team-a&gt; &lt;team-b&gt; --sp1 &lt;name&gt; --sp2 &lt;name&gt;</code>
+      and slot them into the batting team's section.</p>
+      <p class="note"><span class="est">est</span> beside an ENDURANCE means the pitcher split his season
+      between starting and relieving, so neither batters-per-start nor batters-per-outing describes him
+      cleanly; the figure is the rougher of the two.</p>
+      <p class="note"><strong>Changing pitchers.</strong> Before any plate appearance. The reliever starts a
+      fresh track at zero. A pitcher who leaves does not return, and the bullpen on your staff page is all
+      you have — that finite list is the only thing rationing changes, so spending a reliever early is a
+      real decision.</p>
+    </section>`;
 
 const CSS = `
   *{box-sizing:border-box}
@@ -370,20 +440,27 @@ async function main(): Promise<void> {
   const rawDataset = await Bun.file(
     path.resolve(process.cwd(), `dist/complete-dataset-${year}.json`)).json();
   const rawTeams = Array.isArray(rawDataset) ? rawDataset : (rawDataset.teams ?? Object.values(rawDataset));
+  // Keyed by player_id AND team, never by id alone: 120 pitcher ids appear on more
+  // than one team in 2025, and the dataset splits a traded player's season by stint.
+  // An id-only key silently takes whichever stint was iterated last — Rico García's
+  // NYM line printed his one-game NYY stint. Same hazard the count profiles avoid by
+  // keying <player_id>|<TEAM> (design doc §5).
+  const key = (id: string, team: string) => `${id}|${team}`;
   const rawPitching = new Map<string, Record<string, unknown>>();
   const rawPos = new Map<string, string>();
   const isCatcher = new Set<string>();
   for (const t of rawTeams) for (const p of (t.players ?? [])) {
-    if (p.rawPitching) rawPitching.set(p.player_id, p.rawPitching);
-    if (p.rawFielding?.pos != null && p.rawFielding.pos !== '') rawPos.set(p.player_id, String(p.rawFielding.pos));
-    if (p.fielding?.stats?.armStrength != null) isCatcher.add(p.player_id);
+    const k = key(p.player_id, t.team);
+    if (p.rawPitching) rawPitching.set(k, p.rawPitching);
+    if (p.rawFielding?.pos != null && p.rawFielding.pos !== '') rawPos.set(k, String(p.rawFielding.pos));
+    if (p.fielding?.stats?.armStrength != null) isCatcher.add(k);
   }
-  const posOf = (b: NormalizedBatter): string => {
-    const code = (rawPos.get(b.player_id) ?? '').replace(/^\*/, '');
+  const posOf = (b: NormalizedBatter, team: string): string => {
+    const code = (rawPos.get(key(b.player_id, team)) ?? '').replace(/^\*/, '');
     if (code.startsWith('D')) return 'DH';
     const d = code.match(/\d/)?.[0];
     if (d) return convertPositionCode(d);
-    return isCatcher.has(b.player_id) ? 'C' : 'DH';
+    return isCatcher.has(key(b.player_id, team)) ? 'C' : 'DH';
   };
 
   const leagueLev = (() => {
@@ -428,7 +505,7 @@ async function main(): Promise<void> {
       const body = chunk.map(b => {
         const cc = getCountCards(
           tallyFor(profiles, 'batters', b.player_id, batCode.split('-')[0]), pitTally, profiles);
-        return batterBlockHtml(b, posOf(b), cc.leverage, cc.resolution, `vs ${spName}`);
+        return batterBlockHtml(b, posOf(b, batCode.split('-')[0]), cc.leverage, cc.resolution, `vs ${spName}`);
       }).join('');
       out.push({ team: batCode.split('-')[0], section: `OVERLAY vs ${spName} · ${i + 1}–${i + chunk.length}`, body });
     }
@@ -448,6 +525,7 @@ async function main(): Promise<void> {
     }
   } else {
     pages.push({ team: 'COUNT GAME', section: 'rules', body: RULES_PAGE });
+    pages.push({ team: 'COUNT GAME', section: 'pitching', body: PITCHING_PAGE });
     for (const code of teamCodes) {
       const team = code.split('-')[0];
       // A section must open on a recto so no team shares a sheet with the previous
@@ -464,32 +542,33 @@ async function main(): Promise<void> {
         const chunk = lineup.slice(i, i + BATTERS_PER_PAGE);
         const body = chunk.map(b => {
           const cc = getCountCards(tallyFor(profiles, 'batters', b.player_id, team), null, profiles);
-          return batterBlockHtml(b, posOf(b), cc.leverage, cc.resolution, 'generic — any pitcher');
+          return batterBlockHtml(b, posOf(b, team), cc.leverage, cc.resolution, 'generic — any pitcher');
         }).join('');
         pages.push({ team, section: `batters ${i + 1}–${i + chunk.length}`, body });
       }
 
       const lines: PitcherLine[] = [];
       for (const p of td.pitchers) {
-        const raw = rawPitching.get(p.player_id);
-        const gs = Number(raw?.p_gs ?? 0), bfp = Number(raw?.p_bfp ?? 0);
-        if (!isRoster(p.name) || gs < 10) continue;
+        const raw = rawPitching.get(key(p.player_id, team));
+        if (!isRoster(p.name) || (p.TBF ?? 0) < MIN_STAFF_TBF) continue;
         const tl = tallyFor(profiles, 'pitchers', p.player_id, team);
         if (!tl) continue;
         const end = enduranceOf(raw);
         const grade = leverageGrade(getCountCards(null, tl, profiles).leverage, leagueLev);
         lines.push({
-          name: p.name, endurance: end.value, estimated: end.estimated, grade,
+          name: p.name, endurance: end.value, estimated: end.estimated, role: end.role, grade,
           era: Number(raw?.p_earned_run_avg ?? 0), fip: Number(raw?.p_fip ?? 0),
+          ip: Number(raw?.p_ip ?? 0), g: Number(raw?.p_g ?? 0),
           err: coverageError(tl, sample, profiles, grade, leagueLev),
         });
       }
-      lines.sort((a, b) => a.fip - b.fip);
+      lines.sort((a, b) => (a.role === b.role ? a.fip - b.fip : a.role === 'starter' ? -1 : 1));
       pages.push({ team, section: 'pitchers', body: pitcherPageHtml(team, year, lines) });
       for (const l of lines) {
-        console.log(`  ${formatPlayerName(l.name).padEnd(22)} END ${String(l.endurance).padStart(2)}${l.estimated ? '*' : ' '} ` +
+        console.log(`  ${l.role === 'starter' ? 'SP' : 'RP'} ${formatPlayerName(l.name).padEnd(22)} ` +
+          `END ${String(l.endurance).padStart(2)}${l.estimated ? '*' : ' '} ` +
           `grade ${l.grade >= 0 ? '+' : ''}${String(l.grade).padEnd(2)}  Δ ${l.err.toFixed(4)}  ` +
-          (l.err > OVERLAY_THRESHOLD ? 'PRINT OVERLAY' : ''));
+          (l.role === 'starter' && l.err > OVERLAY_THRESHOLD ? 'PRINT OVERLAY' : ''));
       }
     }
   }

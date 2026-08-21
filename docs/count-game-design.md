@@ -294,6 +294,14 @@ The fix: Statcast rows carry `home_team`, `away_team`, and `inning_topbot`, so t
 
 The distiller prints a match-rate audit and the top unmatched players by PA lost. **Read it after every rebuild** — a silent drop in match rate means players are quietly getting league-average cards.
 
+⚠️ **The same hazard recurred outside the pipeline on 2026-08-21.** `printCards.ts` built its
+raw-stat lookups keyed by `player_id` alone, so for the **120 pitcher ids that appear on more
+than one team in 2025** it silently kept whichever stint was iterated last. Rico García's Mets
+line printed his one-game Yankees stint: ENDURANCE 12 instead of 7, ERA 10.13 instead of 2.13.
+Nothing errored. Any new code touching the dataset must key on `(player_id, team)` — the
+dataset splits a traded player's season by stint, and an id is not a player. All 731 rendered
+pitcher rows are now audited against the dataset on every full-league build.
+
 ## 6. Data bug found and fixed: the Athletics
 
 **`dist/complete-dataset-2025.json` had zero Athletics players.** All 30 teams were present; OAK's roster was empty. The digital sim could not simulate the A's at all, and would have generated no A's cards.
