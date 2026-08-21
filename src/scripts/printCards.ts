@@ -25,6 +25,8 @@
  *   bun run print-cards binder --all 2025
  *   bun run print-cards overlay CHC-2025 MIL-2025 --sp Priester
  *   bun run print-cards game CHC-2025 MIL-2025 --sp1 Boyd --sp2 Woodruff
+ *   bun run print-cards scoresheet CHC-2025 MIL-2025   # lineups filled in
+ *   bun run print-cards scoresheet --copies 6          # blanks to photocopy
  */
 
 import { loadTeamFile, loadDataset } from '../utils/dataLoader.js';
@@ -357,6 +359,63 @@ const PITCHING_PAGE = `
       relieved that year, so neither measure fits him cleanly and the figure is a rough one.</p>
     </section>`;
 
+/** Ticks on a fatigue track: enough for a complete game even with heavy spending. */
+const TRACK_BOXES = 28;
+/** Pitcher slots on a scoresheet. The filled rows double as the record of who has been used. */
+const TRACK_ROWS = 6;
+const SCORE_INNINGS = 9;
+
+/**
+ * A scoresheet for one team: their lineup grid on offence and their pitchers'
+ * fatigue tracks on defence, so a manager scores entirely within his own page —
+ * the same principle the binder sections follow.
+ *
+ * The fatigue track is the part no existing scorecard has. Boxes are plain
+ * numbers rather than pre-marked, because ENDURANCE runs 3 for a short reliever
+ * to 21 for a workhorse; you circle your number first, then tick one box per
+ * batter faced and one more per stamina point spent.
+ */
+function scoresheetPage(team?: string, lineup?: NormalizedBatter[]): string {
+  const innings = Array.from({ length: SCORE_INNINGS }, (_, i) => i + 1);
+  const head = `<tr><th class="sn">#</th><th class="sb">batter</th>` +
+    innings.map(i => `<th>${i}</th>`).join('') + `<th>X</th><th class="st">ab h r bi</th></tr>`;
+
+  const rows = Array.from({ length: 9 }, (_, i) => {
+    const name = lineup?.[i] ? esc(formatPlayerName(lineup[i].name)) : '';
+    return `<tr><th class="sn">${i + 1}</th><td class="sb">${name}</td>` +
+      innings.map(() => `<td class="ab"><span class="dia"></span></td>`).join('') +
+      `<td class="ab"><span class="dia"></span></td><td class="st"></td></tr>`;
+  }).join('');
+
+  const totals = ['RUNS', 'HITS', 'LOB'].map(l =>
+    `<tr class="tot"><th class="sn"></th><th class="sb">${l}</th>` +
+    innings.map(() => '<td></td>').join('') + '<td></td><td class="st"></td></tr>').join('');
+
+  const boxes = Array.from({ length: TRACK_BOXES }, (_, i) =>
+    `<span class="bx">${i + 1}</span>`).join('');
+  const tracks = Array.from({ length: TRACK_ROWS }, () =>
+    `<div class="trk"><span class="tn"></span><span class="te">END</span>` +
+    `<div class="bxs">${boxes}</div></div>`).join('');
+
+  return `
+    <section class="blk wide">
+      <header><h3>${team ? esc(team) + ' — scoresheet' : 'Scoresheet'}</h3>
+        <div class="meta">vs ______________ &nbsp; date ____________ &nbsp; final ______</div></header>
+      <table class="score">
+        <thead>${head}</thead>
+        <tbody>${rows}${totals}</tbody>
+      </table>
+    </section>
+    <section class="blk wide">
+      <header><h3>Pitchers</h3>
+        <div class="meta">circle ENDURANCE first · tick one box per batter faced, one more per stamina point</div></header>
+      ${tracks}
+      <p class="note">Past the circled number he is <strong>TIRED</strong>: every leverage roll slides one
+      box toward the hitter and he can no longer bear down. A pitcher who leaves does not return, so these
+      rows are also your record of who has been used.</p>
+    </section>`;
+}
+
 const NOTES_BLOCK = '<section class="blk wide"><header><h3>Notes</h3>' +
   '<div class="meta">scoring, lineups, house rules</div></header></section>';
 
@@ -408,6 +467,24 @@ const CSS = `
   dl.gloss{margin:4px 0 0;display:grid;grid-template-columns:118px 1fr;gap:2px 10px;font-size:10px}
   dl.gloss dt{font-weight:700;text-align:right;color:#222}
   dl.gloss dd{margin:0;color:#333}
+  table.score{font-family:sans-serif;font-size:9px}
+  table.score th,table.score td{border:1px solid #bbb;padding:0}
+  table.score thead th{background:#f4f4f2;font-size:8.5px;padding:2px 0;border-color:#999}
+  th.sn{width:16px;text-align:center;color:#666}
+  td.sb,th.sb{width:104px;text-align:left;padding:0 4px;font-size:9px;font-weight:600}
+  td.ab{height:46px;position:relative}
+  span.dia{position:absolute;left:50%;top:50%;width:19px;height:19px;margin:-10px 0 0 -10px;
+           border:1px solid #ddd;transform:rotate(45deg)}
+  th.st,td.st{width:52px;border-left:2px solid #999}
+  tr.tot td,tr.tot th{height:17px;background:#fafafa}
+  tr.tot th.sb{font-size:8px;letter-spacing:.5px;color:#555}
+  .trk{display:flex;align-items:center;gap:4px;margin-bottom:6px}
+  .tn{flex:0 0 108px;border-bottom:1px solid #999;height:17px}
+  .te{flex:0 0 34px;font:8px sans-serif;color:#666;border-bottom:1px solid #999;height:15px;
+      display:flex;align-items:flex-end;justify-content:flex-end;padding-bottom:1px}
+  .bxs{display:flex;gap:1px}
+  .bx{width:17px;height:15px;border:1px solid #ccc;font:7px sans-serif;color:#bbb;
+      display:flex;align-items:flex-start;justify-content:flex-start;padding-left:1px}
   code{font:10px ui-monospace,Menlo,Consolas,monospace;background:#f2f2f0;padding:1px 3px;border-radius:2px}
   @page{size:letter portrait;margin:0.5in 0.5in 0.55in 0.9in}
   @page :left{margin:0.5in 0.9in 0.55in 0.5in}
@@ -455,7 +532,7 @@ function findStarter(pitchers: NormalizedPitcher[], query?: string): NormalizedP
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
-  const mode = ['overlay', 'binder', 'game'].includes(argv[0]) ? argv.shift()! : 'binder';
+  const mode = ['overlay', 'binder', 'game', 'scoresheet'].includes(argv[0]) ? argv.shift()! : 'binder';
   const flags: Record<string, string | boolean> = {};
   const codes: string[] = [];
   for (let i = 0; i < argv.length; i++) {
@@ -504,9 +581,11 @@ async function main(): Promise<void> {
     return bk.map(x => x / t);
   })();
 
+  // Blank scoresheets are a legitimate request with no teams at all, so the
+  // convenience default must not apply there or it silently prints two lineups.
   const teamCodes = all
     ? (await loadDataset()).teams.map(t => `${t.team}-${t.year}`).filter(c => c.endsWith(`-${year}`))
-    : (codes.length ? codes : ['CHC-2025', 'MIL-2025']);
+    : (codes.length ? codes : (mode === 'scoresheet' ? [] : ['CHC-2025', 'MIL-2025']));
 
   const dataStamp = String((profiles.metadata as Record<string, unknown>).generatedAt ?? '').slice(0, 10);
   const stamp = `profiles ${dataStamp || year} · printed ${new Date().toISOString().slice(0, 10)}`;
@@ -547,7 +626,23 @@ async function main(): Promise<void> {
     return out;
   };
 
-  if (mode === 'overlay' || mode === 'game') {
+  if (mode === 'scoresheet') {
+    const copies = Number(flags.copies ?? 0);
+    if (teamCodes.length) {
+      for (const code of teamCodes) {
+        const team = code.split('-')[0];
+        const td = await loadTeamFile(code);
+        const lineup = [...td.batters].filter(b => isRoster(b.name) && b.PA > 0)
+          .sort((a, b) => b.PA - a.PA).slice(0, 9);
+        pages.push({ team, section: 'scoresheet', body: scoresheetPage(`${team} ${year}`, lineup) });
+        console.log(`  ${team} scoresheet, lineup filled`);
+      }
+    }
+    for (let i = 0; i < (copies || (teamCodes.length ? 0 : 4)); i++) {
+      pages.push({ team: 'COUNT GAME', section: 'scoresheet', body: scoresheetPage() });
+    }
+    if (!pages.length) throw new Error('nothing to print: give teams or --copies N');
+  } else if (mode === 'overlay' || mode === 'game') {
     const [a, b] = teamCodes;
     if (!b) throw new Error(`${mode} needs two teams: <team> <team>`);
     if (mode === 'overlay') {
@@ -555,18 +650,26 @@ async function main(): Promise<void> {
     } else {
       // Each team's batters face the other team's starter.
       pages.push(...await overlayPages(a, b, flags.sp2 as string | undefined));
-      if (pages.length % 2 !== 0) pages.push({ team: a.split('-')[0], section: 'notes', body: NOTES_BLOCK });
+      if (pages.length % 2 !== 0) {
+        pages.push({ team: pages[pages.length - 1].team, section: 'notes', body: NOTES_BLOCK });
+      }
       pages.push(...await overlayPages(b, a, flags.sp1 as string | undefined));
     }
   } else {
     pages.push({ team: 'COUNT GAME', section: 'rules', body: RULES_PAGE });
     pages.push({ team: 'COUNT GAME', section: 'pitching', body: PITCHING_PAGE });
+    // One blank scoresheet lives in the binder so a game can start without a
+    // second print run; `scoresheet --copies N` makes a stack of them.
+    pages.push({ team: 'COUNT GAME', section: 'scoresheet', body: scoresheetPage() });
     for (const code of teamCodes) {
       const team = code.split('-')[0];
       // A section must open on a recto so no team shares a sheet with the previous
-      // one — that is what lets a team be pulled and reprinted as a unit.
+      // one — that is what lets a team be pulled and reprinted as a unit. The pad
+      // belongs to the section it FOLLOWS, not the one it precedes: labelling it
+      // with the incoming team makes that team look like it opens on a verso, and
+      // a blank notes page is useful to the team you just finished.
       if (pages.length % 2 !== 0) {
-        pages.push({ team, section: 'notes', body: NOTES_BLOCK });
+        pages.push({ team: pages[pages.length - 1].team, section: 'notes', body: NOTES_BLOCK });
       }
       const td = await loadTeamFile(code);
       const lineup = [...td.batters].filter(b => isRoster(b.name) && b.PA > 0)
@@ -616,7 +719,7 @@ ${pages.map((p, i) => renderPage(p, year, stamp, i + 1, total)).join('\n')}
 
   const tag = mode === 'binder'
     ? `binder-${all ? `all-${year}` : teamCodes.join('-')}`
-    : `${mode}-${teamCodes.join('-vs-')}`;
+    : teamCodes.length ? `${mode}-${teamCodes.join('-vs-')}` : `${mode}-blank`;
   const outPath = path.resolve(process.cwd(), `dist/${tag}.html`);
   await Bun.write(outPath, html);
   console.log(`\n${total} pages → ${path.relative(process.cwd(), outPath)}`);
