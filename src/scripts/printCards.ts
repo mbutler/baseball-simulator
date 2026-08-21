@@ -444,9 +444,15 @@ const FIELDING_PAGE = `
       <p class="note"><strong>Runners on a hit.</strong> The ones digit does nothing on a hit, so use it:
       <strong>0–6</strong> the runner holds, <strong>7–9</strong> he takes the extra base — first to third
       on a single, second to home. There is no throw to resolve; he either went or he did not.</p>
-      <p class="note"><em>Prototype.</em> The DP and THRU boxes are one box each, which is the number
-      to argue with after a few games — they are the tuning knobs for how often the infield-in gamble bites.
-      Runner speed does not modify the advance band yet.</p>
+      <p class="note"><strong>Playtesting this page.</strong> Write <strong>IN</strong> in the corner of
+      the scoresheet cell whenever you bring the infield in, and circle it if the run scored anyway. The
+      question afterwards is not whether you won those innings — it is whether the call felt like a
+      <em>moment</em> or like bookkeeping. Roughly one a game is what to expect.</p>
+      <p class="note"><em>Prototype.</em> DP and THRU are one box each. Simulation says the choice is worth
+      about a tenth of a run when it comes up, and that neither always-in nor always-back is punished by
+      more than 0.09 runs a game — under what anyone can feel — so the call is genuinely yours. It is a
+      moment, not a lever, which is also true of the real thing. Runner speed does not modify the advance
+      band yet.</p>
     </section>`;
 
 const NOTES_BLOCK = '<section class="blk wide"><header><h3>Notes</h3>' +
