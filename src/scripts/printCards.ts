@@ -13,13 +13,18 @@
  *            pitcher, then that team's starters with ENDURANCE, leverage grade,
  *            and a flag saying whether that pitcher needs an overlay.
  *
- *   overlay  Matchup-specific batter pages for one team against one starter,
- *            laid out to slot into that team's binder section.
+ *   overlay  Matchup-specific batter pages for one team against one named
+ *            starter, laid out to slot into that team's binder section.
+ *
+ *   game     Both overlays for tonight — each team's batters against the other
+ *            team's starter — in one document. This is the one you want before
+ *            a game; overlay is for printing a single side.
  *
  * Usage:
  *   bun run print-cards binder CHC-2025 MIL-2025
  *   bun run print-cards binder --all 2025
- *   bun run print-cards overlay CHC-2025 MIL-2025     # CHC batters vs MIL's ace
+ *   bun run print-cards overlay CHC-2025 MIL-2025 --sp Priester
+ *   bun run print-cards game CHC-2025 MIL-2025 --sp1 Boyd --sp2 Woodruff
  */
 
 import { loadTeamFile, loadDataset } from '../utils/dataLoader.js';
@@ -322,11 +327,42 @@ function renderPage(p: PageSpec, year: string, stamp: string, n: number, total: 
 
 const isRoster = (n: string) => !/team totals|rank in finals|player/i.test(n);
 
+/**
+ * Pick a starter, by name fragment when given and by workload otherwise. Naming
+ * one matters: without it every matchup is the team's ace, and you could never
+ * play the fourth starter you are actually facing tonight.
+ */
+function findStarter(pitchers: NormalizedPitcher[], query?: string): NormalizedPitcher {
+  const eligible = pitchers.filter(p => isRoster(p.name) && p.TBF > 0);
+  if (!query) {
+    const st = eligible.filter(p => (p.stats?.IP ?? 0) >= 50);
+    return [...(st.length ? st : eligible)].sort((a, b) => b.TBF - a.TBF)[0];
+  }
+  const q = query.toLowerCase();
+  const hits = eligible.filter(p => formatPlayerName(p.name).toLowerCase().includes(q));
+  if (hits.length === 1) return hits[0];
+  const listing = [...eligible].sort((a, b) => b.TBF - a.TBF).slice(0, 12)
+    .map(p => `  ${formatPlayerName(p.name)} (${p.TBF} TBF)`).join('\n');
+  if (!hits.length) throw new Error(`No pitcher matching "${query}". Most used:\n${listing}`);
+  throw new Error(`"${query}" matches ${hits.length} pitchers: ` +
+    `${hits.map(h => formatPlayerName(h.name)).join(', ')}. Be more specific.`);
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
-  const mode = (argv[0] === 'overlay' || argv[0] === 'binder') ? argv.shift()! : 'binder';
-  const all = argv.includes('--all');
-  const codes = argv.filter(a => !a.startsWith('--'));
+  const mode = ['overlay', 'binder', 'game'].includes(argv[0]) ? argv.shift()! : 'binder';
+  const flags: Record<string, string | boolean> = {};
+  const codes: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (!a.startsWith('--')) { codes.push(a); continue; }
+    const key = a.slice(2);
+    const next = argv[i + 1];
+    // --all takes no value; the year that follows it is a positional.
+    if (key !== 'all' && next && !next.startsWith('--')) { flags[key] = next; i++; }
+    else flags[key] = true;
+  }
+  const all = flags.all === true;
   const year = (codes[0]?.split('-')[1]) ?? '2025';
 
   const profiles = await Bun.file(
@@ -375,27 +411,40 @@ async function main(): Promise<void> {
 
   const pages: PageSpec[] = [];
 
-  if (mode === 'overlay') {
-    const [batCode, pitCode] = teamCodes;
-    if (!pitCode) throw new Error('overlay needs two teams: <batting-team> <pitching-team>');
+  /** Overlay pages for one batting team against one named starter. */
+  const overlayPages = async (batCode: string, pitCode: string, spQuery?: string): Promise<PageSpec[]> => {
     const batting = await loadTeamFile(batCode);
     const pitching = await loadTeamFile(pitCode);
-    const el = pitching.pitchers.filter(p => isRoster(p.name) && p.TBF > 0);
-    const st = el.filter(p => (p.stats?.IP ?? 0) >= 50);
-    const starter = [...(st.length ? st : el)].sort((a, b) => b.TBF - a.TBF)[0];
+    const starter = findStarter(pitching.pitchers, spQuery);
     const pitTally = tallyFor(profiles, 'pitchers', starter.player_id, pitCode.split('-')[0]);
+    if (!pitTally) throw new Error(`No count profile for ${formatPlayerName(starter.name)}`);
     const lineup = [...batting.batters].filter(b => isRoster(b.name) && b.PA > 0)
       .sort((a, b) => b.PA - a.PA).slice(0, 9);
-    const label = `OVERLAY vs ${formatPlayerName(starter.name)}`;
-    console.log(`\n${batCode} overlay — vs ${formatPlayerName(starter.name)} (${pitCode})\n`);
+    const spName = formatPlayerName(starter.name);
+    const out: PageSpec[] = [];
+    console.log(`\n${batCode} batters vs ${spName} (${pitCode})`);
     for (let i = 0; i < lineup.length; i += BATTERS_PER_PAGE) {
       const chunk = lineup.slice(i, i + BATTERS_PER_PAGE);
       const body = chunk.map(b => {
-        const cc = getCountCards(tallyFor(profiles, 'batters', b.player_id, batCode.split('-')[0]), pitTally, profiles);
-        console.log(`  ${formatPlayerName(b.name)}`);
-        return batterBlockHtml(b, posOf(b), cc.leverage, cc.resolution, `vs ${formatPlayerName(starter.name)}`);
+        const cc = getCountCards(
+          tallyFor(profiles, 'batters', b.player_id, batCode.split('-')[0]), pitTally, profiles);
+        return batterBlockHtml(b, posOf(b), cc.leverage, cc.resolution, `vs ${spName}`);
       }).join('');
-      pages.push({ team: batCode.split('-')[0], section: `${label} · ${i + 1}–${i + chunk.length}`, body });
+      out.push({ team: batCode.split('-')[0], section: `OVERLAY vs ${spName} · ${i + 1}–${i + chunk.length}`, body });
+    }
+    return out;
+  };
+
+  if (mode === 'overlay' || mode === 'game') {
+    const [a, b] = teamCodes;
+    if (!b) throw new Error(`${mode} needs two teams: <team> <team>`);
+    if (mode === 'overlay') {
+      pages.push(...await overlayPages(a, b, flags.sp as string | undefined));
+    } else {
+      // Each team's batters face the other team's starter.
+      pages.push(...await overlayPages(a, b, flags.sp2 as string | undefined));
+      if (pages.length % 2 !== 0) pages.push({ team: a.split('-')[0], section: 'notes', body: NOTES_BLOCK });
+      pages.push(...await overlayPages(b, a, flags.sp1 as string | undefined));
     }
   } else {
     pages.push({ team: 'COUNT GAME', section: 'rules', body: RULES_PAGE });
@@ -451,11 +500,18 @@ async function main(): Promise<void> {
 ${pages.map((p, i) => renderPage(p, year, stamp, i + 1, total)).join('\n')}
 </body></html>`;
 
-  const tag = mode === 'overlay' ? `overlay-${teamCodes.join('-vs-')}` : `binder-${all ? `all-${year}` : teamCodes.join('-')}`;
+  const tag = mode === 'binder'
+    ? `binder-${all ? `all-${year}` : teamCodes.join('-')}`
+    : `${mode}-${teamCodes.join('-vs-')}`;
   const outPath = path.resolve(process.cwd(), `dist/${tag}.html`);
   await Bun.write(outPath, html);
   console.log(`\n${total} pages → ${path.relative(process.cwd(), outPath)}`);
   console.log(`stamp: ${stamp}\n`);
 }
 
-main().catch(err => { console.error(err); process.exit(1); });
+main().catch(err => {
+  // Usage errors here are things like an unmatched pitcher name; the message is
+  // the useful part and a stack trace only buries it.
+  console.error(`\n${err instanceof Error ? err.message : String(err)}\n`);
+  process.exit(1);
+});
