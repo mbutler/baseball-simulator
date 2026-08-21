@@ -11,7 +11,8 @@
     "fetch-count-data": "bun run src/scripts/fetchCountData.ts",
     "build-count-profiles": "bun run src/scripts/buildCountProfiles.ts",
     "shift-policy": "bun run src/scripts/shiftPolicySim.ts",
-    "print-cards": "bun run src/scripts/printCards.ts"
+    "print-cards": "bun run src/scripts/printCards.ts",
+    "fielding-policy": "bun run src/scripts/fieldingPolicySim.ts"
   },
   "devDependencies": {
     "documentation": "^14.0.3"
